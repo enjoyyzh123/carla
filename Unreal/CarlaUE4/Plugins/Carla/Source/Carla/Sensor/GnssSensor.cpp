@@ -5,11 +5,15 @@
 // For a copy, see <https://opensource.org/licenses/MIT>.
 
 #include "Carla.h"
+#include "Carla/Actor/ActorBlueprintFunctionLibrary.h"
 #include "Carla/Sensor/GnssSensor.h"
 #include "Carla/Game/CarlaEpisode.h"
+#include "Carla/Game/CarlaStatics.h"
+#include "Carla/MapGen/LargeMapManager.h"
 
 #include <compiler/disable-ue4-macros.h>
 #include "carla/geom/Vector3D.h"
+#include "carla/ros2/ROS2.h"
 #include <compiler/enable-ue4-macros.h>
 
 AGnssSensor::AGnssSensor(const FObjectInitializer &ObjectInitializer)
@@ -32,7 +36,15 @@ void AGnssSensor::Set(const FActorDescription &ActorDescription)
 
 void AGnssSensor::PostPhysTick(UWorld *World, ELevelTick TickType, float DeltaSeconds)
 {
-  carla::geom::Location Location = GetActorLocation();
+  TRACE_CPUPROFILER_EVENT_SCOPE(AGnssSensor::PostPhysTick);
+
+  FVector ActorLocation = GetActorLocation();
+  ALargeMapManager * LargeMap = UCarlaStatics::GetLargeMapManager(GetWorld());
+  if (LargeMap)
+  {
+    ActorLocation = LargeMap->LocalToGlobalLocation(ActorLocation);
+  }
+  carla::geom::Location Location = ActorLocation;
   carla::geom::GeoLocation CurrentLocation = CurrentGeoReference.Transform(Location);
 
   // Compute the noise for the sensor
@@ -46,7 +58,30 @@ void AGnssSensor::PostPhysTick(UWorld *World, ELevelTick TickType, float DeltaSe
   double Altitude = CurrentLocation.altitude + AltitudeBias + AltError;
 
   auto Stream = GetDataStream(*this);
-  Stream.Send(*this, carla::geom::GeoLocation{Latitude, Longitude, Altitude});
+
+  // ROS2
+  #if defined(WITH_ROS2)
+  auto ROS2 = carla::ros2::ROS2::GetInstance();
+  if (ROS2->IsEnabled())
+  {
+    TRACE_CPUPROFILER_EVENT_SCOPE_STR("ROS2 Send");
+    auto StreamId = carla::streaming::detail::token_type(GetToken()).get_stream_id();
+    AActor* ParentActor = GetAttachParentActor();
+    if (ParentActor)
+    {
+      FTransform LocalTransformRelativeToParent = GetActorTransform().GetRelativeTransform(ParentActor->GetActorTransform());
+      ROS2->ProcessDataFromGNSS(Stream.GetSensorType(), StreamId, LocalTransformRelativeToParent, carla::geom::GeoLocation{Latitude, Longitude, Altitude}, this);
+    }
+    else
+    {
+      ROS2->ProcessDataFromGNSS(Stream.GetSensorType(), StreamId, Stream.GetSensorTransform(), carla::geom::GeoLocation{Latitude, Longitude, Altitude}, this);
+    }
+  }
+  #endif
+  {
+    TRACE_CPUPROFILER_EVENT_SCOPE_STR("AGnssSensor Stream Send");
+    Stream.SerializeAndSend(*this, carla::geom::GeoLocation{Latitude, Longitude, Altitude});
+  }
 }
 
 void AGnssSensor::SetLatitudeDeviation(float Value)

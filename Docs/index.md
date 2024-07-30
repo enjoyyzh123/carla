@@ -1,97 +1,71 @@
 # CARLA Documentation
 
-Welcome to the CARLA documentation. 
+Welcome to the CARLA documentation.
 
-This home page contains an index with a brief description of the different sections in the documentation. Feel free to read in whatever order preferred. In any case, here are a few suggestions for newcomers.  
+This home page contains an index with a brief description of the different sections in the documentation. Feel free to read in whatever order preferred. In any case, here are a few suggestions for newcomers.
 
-* __Install CARLA.__ Either follow the [Quick start installation](start_quickstart.md) to get a CARLA release or [make the build](build_linux.md) for a desired platform.  
-* __Start using CARLA.__ The section titled [First steps](core_concepts.md) is an introduction to the most important concepts.  
-* __Check the API.__ there is a handy [Python API reference](python_api.md) to look up the classes and methods available.  
+* __Install CARLA.__ Either follow the [Quick start installation](start_quickstart.md) to get a CARLA release or [make the build](build_carla.md) for a desired platform.
+* __Start using CARLA.__ The section titled [Foundations](foundations.md) is an introduction to the most important concepts and the [first steps tutorial](tuto_first_steps.md) shows you how to get started.
+* __Check the API.__ there is a handy [Python API reference](python_api.md) to look up the classes and methods available.
 
-The CARLA forum is available to post any doubts or suggestions that may arise during the reading.  
+The CARLA forum is available to post any doubts or suggestions that may arise during the reading.
 <div class="build-buttons">
-<a href="https://forum.carla.org/" target="_blank" class="btn btn-neutral" title="Go to the latest CARLA release">
+<a href="https://github.com/carla-simulator/carla/discussions/" target="_blank" class="btn btn-neutral" title="Go to the latest CARLA release">
 CARLA forum</a>
 </div>
 
+<br>
+
 !!! Warning
-    Change the docs version to fit the CARLA version you are using. Use the pannel in the bottom-right side of this window to change to previous versions. ![docs_version_panel](img/docs_version_panel.jpg)
+    __Change the docs version to fit the CARLA version you are using__. Use the panel in the bottom-right side of this window to change to previous versions. __The _Latest_ version points to documentation in the `dev` branch__ which may refer to features currently in development and __not available__ in any packaged version of CARLA, as well general documentation improvements. ![docs_version_panel](img/docs_version_panel.jpg)
 
 ---
 
 ## Getting started
 
 [__Introduction__](start_introduction.md) — What to expect from CARLA.  
-[__Quick start__](start_quickstart.md) — Get the CARLA releases.  
+[__Quick start package installation__](start_quickstart.md) — Get the CARLA releases.    
+[__First steps__](tuto_G_getting_started.md) — Taking the first steps in CARLA.  
+[__Building CARLA__](build_carla.md) — How to build CARLA from source.
 
+## CARLA components
+[__Foundations__](core_concepts.md) — Overview of the fundamental building blocks of CARLA.    
+[__Actors__](core_actors.md) — Learn about actors and how to handle them.  
+[__Maps__](core_map.md) — Discover the different maps and how do vehicles move around.  
+[__Sensors and data__](core_sensors.md) — Retrieve simulation data using sensors.  
+[__Traffic__](ts_traffic_simulation_overview.md) — An overview of the different options available to populate your scenes with traffic.  
+[__3rd party integrations__](3rd_party_integrations.md) — Integrations with 3rd party applications and libraries.   
+[__Development__](development_tutorials.md) — Information on how to develop custom features for CARLA.  
+[__Custom assets__](custom_assets_tutorials.md) — Information on how to develop custom assets 
 
-## Building CARLA
+## Resources
+[__Blueprint library__](bp_library.md) — Blueprints provided to spawn actors.   
+[__Python API__](python_api.md) — Classes and methods in the Python API.   
+[__C++ reference__](ref_cpp.md) — Classes and methods in CARLA C++.    
 
-[__Linux build__](build_linux.md) — Make the build on Linux.  
-[__Windows build__](build_windows.md) — Make the build on Windows.  
-[__Update CARLA__](build_update.md) — Get up to date with the latest content.  
-[__Build system__](build_system.md) — Learn about the build and how it is made.  
-[__Running in a Docker__](build_docker.md) — Run CARLA using a container solution.  
-[__F.A.Q.__](build_faq.md) — Some of the most frequent installation issues.  
+## CARLA ecosystem
 
+[__ROS bridge documentation__](ros_documentation.md) — Brief overview of the ROS bridge and a link to the full documentation  
+[__MathWorks__](large_map_roadrunner.md) — Overview of creating a map in RoadRunner.    
+[__SUMO__](adv_sumo.md) — Details of the co-simulation feature with SUMO.   
+[__Scenic__](tuto_G_scenic.md) — How to use Scenic with CARLA to generate scenarios.    
+[__Chrono__](tuto_G_chrono.md) — Details of the Chrono physics simulation integration with CARLA.   
+[__OpenDrive__](adv_opendrive.md) — Details of the OpenDrive support in CARLA.  
+[__PTV-Vissim__](adv_ptv.md) — Details of the co-simulation feature with PTV-Vissim.    
+[__RSS__](adv_rss.md) — Details of the Responsibility Sensitive Safety library integration with CARLA.  
+[__AWS__](tuto_G_rllib_integration) — Details of using RLlib to run CARLA as a distributed application on Amazon Web Services.  
+[__ANSYS__](ecosys_ansys.md) — Brief overview of how the Ansys Real Time Radar Model was integrated into CARLA.  
+[__carlaviz — web visualizer__](plugins_carlaviz.md) — Plugin that listens the simulation and shows the scene and some simulation data in a web browser.
 
-## First steps
-[__Core concepts__](core_concepts.md) — Overview of the basic concepts in CARLA.  
-[__1st. World and client__](core_world.md) — Manage and access the simulation.  
-[__2nd. Actors and blueprints__](core_actors.md) — Learn about actors and how to handle them.  
-[__3rd. Maps and navigation__](core_map.md) — Discover the different maps and how do vehicles move around.  
-[__4th. Sensors and data__](core_sensors.md) — Retrieve simulation data using sensors.  
+## Contributing to CARLA
+[__Guidelines__](cont_contribution_guidelines.md) — Guidelines on contributing to the development of the CARLA simulator and its ecosystem.   
+[__Coding standards__](cont_coding_standard.md) — Details on the best coding practices when contributing to CARLA development.  
+[__Documentation standard__](cont_doc_standard.md) — Details on the documentation standards for CARLA docs.     
 
-## Advanced steps
-[__OpenDRIVE standalone mode__](adv_opendrive.md) — Use any OpenDRIVE file as a CARLA map.  
-[__PTV-Vissim co-simulation__](adv_ptv.md) — Run a synchronous simulation between CARLA and PTV-Vissim.  
-[__Recorder__](adv_recorder.md) — Register the events in a simulation and play it again.  
-[__Rendering options__](adv_rendering_options.md) — From quality settings to no-render or off-screen modes.  
-[__RSS__](adv_rss.md) — An implementation of RSS in the CARLA client library.  
-[__SUMO co-simulation__](adv_sumo.md) — Run a synchronous simulation between CARLA and SUMO.  
-[__Synchrony and time-step__](adv_synchrony_timestep.md) — Client-server communication and simulation time.  
-[__Traffic Manager__](adv_traffic_manager.md) — Simulate urban traffic by setting vehicles to autopilot mode.  
+## Tutorials
 
-## References
-[__Python API reference__](python_api.md) — Classes and methods in the Python API.   
-[__Blueprint library__](bp_library.md) — Blueprints provided to spawn actors.  
-[__C++ reference__](ref_cpp.md) — Classes and methods in CARLA C++.  
-[__Recorder binary file format__](ref_recorder_binary_file_format.md) — Detailed explanation of the recorder file format.  
-[__Sensors reference__](ref_sensors.md) — Everything about sensors and the data they retrieve.  
+There are numerous tutorials covering CARLA features with code and guidelines for varied use cases. Please check the [tutorials page](tutorials.md) for help with your work.
 
-## Plugins
-[__carlaviz — web visualizer__](plugins_carlaviz.md) — Plugin that listens the simulation and shows the scene and some simulation data in a web browser.  
+## Extended documentation
 
-## ROS bridge
-[__ROS bridge installation__](ros_installation.md) — The different ways to install the ROS bridge.  
-[__CARLA messages reference__](ros_msgs.md) — Contains explanations and fields for every type of CARLA message available in ROS.  
-[__Launchfiles reference__](ros_launchs.md) — Lists the launchfiles and nodes provided, and the topics being consumed and published.  
-
-## Tutorials — General
-[__Add friction triggers__](tuto_G_add_friction_triggers.md) — Define dynamic box triggers for wheels.  
-[__Control vehicle physics__](tuto_G_control_vehicle_physics.md) — Set runtime changes on a vehicle physics.  
-[__Control walker skeletons__](tuto_G_control_walker_skeletons.md) — Animate walkers using skeletons.  
-[__Retrieve simulation data__](tuto_G_retrieve_data.md) — A step by step guide to properly gather data using the recorder.  
-
-## Tutorials — Assets
-[__Add a new map__](tuto_A_add_map.md) — Create and ingest a new map.  
-[__Add a new vehicle__](tuto_A_add_vehicle.md) — Prepare a vehicle to be used in CARLA.  
-[__Add new props__](tuto_A_add_props.md) — Import additional props into CARLA.  
-[__Create standalone packages__](tuto_A_create_standalone.md) — Generate and handle standalone packages for assets.  
-[__Map customization__](tuto_A_map_customization.md) — Edit an existing map.  
-[__Material customization__](tuto_A_material_customization.md) — Edit vehicle and building materials.  
-[__Vehicle modelling__](tuto_A_vehicle_modelling.md) — Create a new vehicle for CARLA.  
-
-## Tutorials — Developers
-[__Contribute with new assets__](tuto_D_contribute_assets.md) — Add new content to CARLA.  
-[__Create a sensor__](tuto_D_create_sensor.md) — Develop a new sensor to be used in CARLA.  
-[__Customize vehicle suspension__](tuto_D_customize_vehicle_suspension.md) — Modify the suspension system of a vehicle.  
-[__Make a release__](tuto_D_make_release.md) — For developers who want to publish a release.  
-[__Generate detailed colliders__](tuto_D_generate_colliders.md) — Create detailed colliders for vehicles.  
-[__Generate pedestrian navigation__](tuto_D_generate_pedestrian_navigation.md) — Obtain the information needed for walkers to move around.  
-
-## Contributing
-[__Contribution guidelines__](cont_contribution_guidelines.md) — The different ways to contribute to CARLA.  
-[__Code of conduct__](cont_code_of_conduct.md) — Standard rights and duties for contributors.  
-[__Coding standard__](cont_coding_standard.md) — Guidelines to write proper code.  
-[__Documentation standard__](cont_doc_standard.md) — Guidelines to write proper documentation.  
+The pages above cover most of the core concepts and features of CARLA. There is additional documentation in the [extended documentation](ext_docs.md) section covering advanced features in more depth.

@@ -5,6 +5,7 @@ rem BAT script that downloads and installs a ready to use
 rem x64 zlib build for CARLA (carla.org).
 rem Run it through a cmd with the x64 Visual C++ Toolset enabled.
 
+set MAKEFLAGS=
 set LOCAL_PATH=%~dp0
 set FILE_N=    -[%~n0]:
 
@@ -39,7 +40,7 @@ rem If not set set the build dir to the current dir
 if "%BUILD_DIR%" == "" set BUILD_DIR=%~dp0
 if not "%BUILD_DIR:~-1%"=="\" set BUILD_DIR=%BUILD_DIR%\
 
-rem If not defined, use Visual Studio 2017 as tool set
+rem If not defined, use Visual Studio 2019 as tool set
 if "%TOOLSET%" == "" set TOOLSET=""
 
 rem ============================================================================
@@ -47,14 +48,14 @@ rem -- Local Variables ---------------------------------------------------------
 rem ============================================================================
 
 set ZLIB_BASENAME=zlib
-set ZLIB_VERSION=1.2.11
+set ZLIB_VERSION=1.2.13
 
 set ZLIB_TEMP_FOLDER=%ZLIB_BASENAME%-%ZLIB_VERSION%
 set ZLIB_TEMP_FILE=%ZLIB_TEMP_FOLDER%.zip
 set ZLIB_TEMP_FILE_DIR=%BUILD_DIR%%ZLIB_TEMP_FILE%
 
-set ZLIB_REPO=http://www.zlib.net/zlib%ZLIB_VERSION:.=%.zip
-
+set ZLIB_REPO=https://www.zlib.net/zlib%ZLIB_VERSION:.=%.zip
+set ZLIB_BACKUP_REPO=https://carla-releases.s3.us-east-005.backblazeb2.com/Backup/zlib%ZLIB_VERSION:.=%.zip
 set ZLIB_SRC_DIR=%BUILD_DIR%%ZLIB_BASENAME%-source\
 set ZLIB_INSTALL_DIR=%BUILD_DIR%%ZLIB_BASENAME%-install\
 
@@ -70,8 +71,12 @@ if not exist "%ZLIB_SRC_DIR%" (
     if not exist "%ZLIB_TEMP_FILE_DIR%" (
         echo %FILE_N% Retrieving %ZLIB_BASENAME%.
         powershell -Command "(New-Object System.Net.WebClient).DownloadFile('%ZLIB_REPO%', '%ZLIB_TEMP_FILE_DIR%')"
-        if %errorlevel% neq 0 goto error_download
     )
+    if not exist "%ZLIB_TEMP_FILE_DIR%" (
+        echo %FILE_N% Retrieving %ZLIB_BASENAME% from backup.
+        powershell -Command "(New-Object System.Net.WebClient).DownloadFile('%ZLIB_BACKUP_REPO%', '%ZLIB_TEMP_FILE_DIR%')"
+    )
+    if %errorlevel% neq 0 goto error_download
     rem Extract the downloaded library
     echo %FILE_N% Extracting zlib from "%ZLIB_TEMP_FILE%".
     powershell -Command "Expand-Archive '%ZLIB_TEMP_FILE_DIR%' -DestinationPath '%BUILD_DIR%'"
@@ -167,6 +172,7 @@ rem ============================================================================
 :good_exit
     echo %FILE_N% Exiting...
     rem A return value used for checking for errors
+    copy %ZLIB_INSTALL_DIR%\lib\zlibstatic.lib %CARLA_DEPENDENCIES_FOLDER%\lib
     endlocal & set install_zlib=%ZLIB_INSTALL_DIR%
     exit /b 0
 

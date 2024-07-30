@@ -10,7 +10,6 @@
 #include "carla/nav/Navigation.h"
 #include "carla/NonCopyable.h"
 #include "carla/client/Timestamp.h"
-#include "carla/client/detail/EpisodeProxy.h"
 #include "carla/rpc/ActorId.h"
 
 #include <memory>
@@ -19,16 +18,16 @@ namespace carla {
 namespace client {
 namespace detail {
 
-  class Client;
   class Episode;
   class EpisodeState;
+  class Simulator;
 
   class WalkerNavigation
     : public std::enable_shared_from_this<WalkerNavigation>,
     private NonCopyable {
   public:
 
-    explicit WalkerNavigation(Client & client);
+    explicit WalkerNavigation(std::weak_ptr<Simulator> simulator);
 
     void RegisterWalker(ActorId walker_id, ActorId controller_id) {
       // add to list
@@ -85,9 +84,13 @@ namespace detail {
       _nav.SetPedestriansCrossFactor(percentage);
     }
 
+    void SetPedestriansSeed(unsigned int seed) {
+      _nav.SetSeed(seed);
+    }
+
   private:
 
-    Client &_client;
+    std::weak_ptr<Simulator> _simulator;
 
     unsigned long _next_check_index;
 

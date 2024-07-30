@@ -79,6 +79,11 @@ public:
     return CarlaEngine.GetServer();
   }
 
+  FCarlaServer &GetServer()
+  {
+    return CarlaEngine.GetServer();
+  }
+
   void SetOpendriveGenerationParameters(
       const carla::rpc::OpendriveGenerationParameters & Parameters)
   {
@@ -103,6 +108,11 @@ public:
     return CurrentMapLayer;
   }
 
+  FCarlaEngine* GetCarlaEngine()
+  {
+    return &CarlaEngine;
+  }
+
 private:
 
   UPROPERTY(Category = "CARLA Settings", EditAnywhere)
@@ -117,5 +127,8 @@ private:
 
   UPROPERTY(Category = "CARLA Game Instance", EditAnywhere)
   int32 CurrentMapLayer = static_cast<int32>(carla::rpc::MapLayer::All);
+
+  UPROPERTY()
+  FString _MapPath;
 
 };

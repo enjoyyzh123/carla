@@ -42,8 +42,8 @@
         doc: >
           A list of commands to execute in batch. Each command is different and has its own parameters. They appear listed at the bottom of this page.
       doc: >
-        Executes a list of commands on a single simulation step and retrieves no information. If you need information about the response of each command, use the __<font color="#7fb800">apply_batch_sync()</font>__ method.  
-        [Here](https://github.com/carla-simulator/carla/blob/10c5f6a482a21abfd00220c68c7f12b4110b7f63/PythonAPI/examples/spawn_npc.py#L126) is an example on how to delete the actors that appear in carla.ActorList all at once.
+        Executes a list of commands on a single simulation step and retrieves no information. If you need information about the response of each command, use the __<font color="#7fb800">apply_batch_sync()</font>__ method.
+        [Here](https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/generate_traffic.py) is an example on how to delete the actors that appear in carla.ActorList all at once.
     # --------------------------------------
     - def_name: apply_batch_sync
       params:
@@ -58,7 +58,7 @@
           A boolean parameter to specify whether or not to perform a carla.World.tick after applying the batch in _synchronous mode_. It is __False__ by default.
       return: list(command.Response)
       doc: >
-        Executes a list of commands on a single simulation step, blocks until the commands are linked, and returns a list of <b>command.Response</b> that can be used to determine whether a single command succeeded or not. [Here](https://github.com/carla-simulator/carla/blob/10c5f6a482a21abfd00220c68c7f12b4110b7f63/PythonAPI/examples/spawn_npc.py#L112-L116) is an example of it being used to spawn actors.
+        Executes a list of commands on a single simulation step, blocks until the commands are linked, and returns a list of <b>command.Response</b> that can be used to determine whether a single command succeeded or not. [Here](https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/generate_traffic.py) is an example of it being used to spawn actors.
     # --------------------------------------
     - def_name: generate_opendrive_world
       params:
@@ -140,6 +140,10 @@
         type: int
         doc: >
           ID of the actor to follow. If this is 0 then camera is disabled.
+      - param_name: replay_sensors
+        type: bool
+        doc: >
+          Flag to enable or disable the spawn of sensors during playback.
       doc: >
         Load a new world with default settings using `map_name` map. All actors
         present in the current world will be destroyed, __but__ traffic manager instances will stay alive.
@@ -293,8 +297,51 @@
         doc: >
           New timeout value. Default is 5 seconds.
       doc: >
-        Sets the maxixum time a network call is allowed before blocking it and raising a timeout exceeded error.
+        Sets the maximum time a network call is allowed before blocking it and raising a timeout exceeded error.
      # --------------------------------------
+    - def_name: set_replayer_ignore_hero
+      params:
+      - param_name: ignore_hero
+        type: bool
+        doc: >
+          Enables or disables playback of the hero vehicle during a playback of a recorded simulation.
+    # --------------------------------------
+    - def_name: set_replayer_ignore_spectator
+      params:
+      - param_name: ignore_spectator
+        type: bool
+        doc: >
+          Determines whether the recorded spectator movements will be replicated by the replayer.
+     # --------------------------------------
+    - def_name: set_files_base_folder
+      params:
+      - param_name: path
+        type: str
+        doc: >
+           Specifies the base folder where the local cache for required files will be placed.
+     # --------------------------------------
+    - def_name: get_required_files
+      params:
+      - param_name: folder
+        type: str
+        doc: >
+          Folder where files required by the client will be downloaded to.
+      - param_name: download
+        type: bool
+        default: True
+        doc: >
+          If True, downloads files that are not already in cache.
+      doc: >
+         Asks the server which files are required by the client to use the current map. Option to download files automatically if they are not already in the cache.
+     # --------------------------------------
+    - def_name: request_file
+      params:
+      - param_name: name
+        type: str
+        doc: >
+          Name of the file you are requesting.
+      doc: >
+        Requests one of the required files returned by carla.Client.get_required_files.
 
   - class_name: TrafficManager
     # - DESCRIPTION ------------------------
@@ -374,6 +421,17 @@
 
         Default is 30. Exceeding a speed limit can be done using negative percentages.
     # --------------------------------------
+    - def_name: global_lane_offset
+      params:
+      - param_name: offset
+        type: float
+        doc: >
+          Lane offset displacement from the center line.
+      doc: >
+        Sets a global lane offset displacement from the center line. Positive values imply a right offset while negative ones mean a left one.
+
+        Default is 0. Numbers high enough to cause the vehicle to drive through other lanes might break the controller.
+    # --------------------------------------
     - def_name: ignore_lights_percentage
       params:
       - param_name: actor
@@ -398,7 +456,7 @@
         doc: >
           Between 0 and 100. Amount of times stop signs will be ignored.
       doc: >
-        During the traffic light stage, which runs every frame, this method sets the percent chance that stop signs will be ignored for a vehicle.  
+        During the traffic light stage, which runs every frame, this method sets the percent chance that stop signs will be ignored for a vehicle.
     # --------------------------------------
     - def_name: ignore_vehicles_percentage
       params:
@@ -426,10 +484,6 @@
       doc: >
         During the collision detection stage, which runs every frame, this method sets a percent chance that collisions with walkers will be ignored for a vehicle.
     # --------------------------------------
-    - def_name: reset_traffic_lights
-      doc: >
-        Resets every traffic light in the map to its initial state.
-    # --------------------------------------
     - def_name: vehicle_percentage_speed_difference
       params:
       - param_name: actor
@@ -444,6 +498,36 @@
         Sets the difference the vehicle's intended speed and its current speed limit. Speed limits can be exceeded by setting the `perc` to a negative value.
 
         Default is 30. Exceeding a speed limit can be done using negative percentages.
+    # --------------------------------------
+    - def_name: vehicle_lane_offset
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          Vehicle whose lane offset behaviour is being changed.
+      - param_name: offset
+        type: float
+        doc: >
+          Lane offset displacement from the center line.
+      doc: >
+        Sets a lane offset displacement from the center line. Positive values imply a right offset while negative ones mean a left one.
+
+        Default is 0. Numbers high enough to cause the vehicle to drive through other lanes might break the controller.
+    # --------------------------------------
+    - def_name: update_vehicle_lights
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          Vehicle whose lights status is being changed.
+      - param_name: do_update
+        type: bool
+        doc: >
+          If __True__ the traffic manager will manage the vehicle lights for the specified vehicle.
+      doc: >
+        Sets if the Traffic Manager is responsible of updating the vehicle lights, or not.
+
+        Default is __False__. The traffic manager will not change the vehicle light status of a vehicle, unless its auto_update_status is st to __True__.
     # --------------------------------------
     - def_name: get_port
       params:
@@ -461,6 +545,19 @@
       doc: >
         Sets the minimum distance in meters that vehicles have to keep with the rest. The distance is in meters and will affect the minimum moving distance. It is computed from center to center of the vehicle objects.
     # --------------------------------------
+    - def_name: set_desired_speed
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          Vehicle whose speed is being changed.
+      - param_name: speed
+        type: float
+        doc: >
+          Desired speed at which the vehicle will move.
+      doc: >
+        Sets the speed of a vehicle to the specified value.
+    # --------------------------------------
     - def_name: set_hybrid_physics_mode
       params:
       - param_name: enabled
@@ -471,11 +568,11 @@
       doc: >
         Enables or disables the hybrid physics mode. In this mode, vehicle's farther than a certain radius from the ego vehicle will have their physics disabled. Computation cost will be reduced by not calculating vehicle dynamics. Vehicles will be teleported.
     # --------------------------------------
-    - def_name: set_hybrid_mode_radius
+    - def_name: set_hybrid_physics_radius
       params:
       - param_name: r
         type: float
-        default: 70.0
+        default: 50.0
         param_units: meters
         doc: >
           New radius where physics are enabled.
@@ -488,11 +585,11 @@
         type: bool
         default: true
         doc: >
-          If __True__, the OSM mode is enabled. 
+          If __True__, the OSM mode is enabled.
       doc: >
-        Enables or disables the OSM mode. This mode allows the user to run TM in a map created with the [OSM feature](tuto_G_openstreetmap.md). These maps allow having dead-end streets. Normally, if vehicles cannot find the next waypoint, TM crashes. If OSM mode is enabled, it will show a warning, and destroy vehicles when necessary.  
+        Enables or disables the OSM mode. This mode allows the user to run TM in a map created with the [OSM feature](tuto_G_openstreetmap.md). These maps allow having dead-end streets. Normally, if vehicles cannot find the next waypoint, TM crashes. If OSM mode is enabled, it will show a warning, and destroy vehicles when necessary.
     # --------------------------------------
-    - def_name: set_percentage_keep_right_rule
+    - def_name: keep_right_rule_percentage
       params:
       - param_name: actor
         type: carla.Actor
@@ -510,7 +607,7 @@
       - param_name: value
         type: int
         doc: >
-          Seed value for the random number generation of the Traffic Manager. 
+          Seed value for the random number generation of the Traffic Manager.
       doc: >
         Sets a specific random seed for the Traffic Manager, thereby setting it to be deterministic.
     # --------------------------------------
@@ -520,11 +617,116 @@
         type: bool
         default: true
         doc: >
-          If __True__, the TM synchronous mode is enabled. 
+          If __True__, the TM synchronous mode is enabled.
       doc: >
-        Sets the Traffic Manager to [synchronous mode](adv_traffic_manager.md#synchronous-mode). In a [multiclient situation](adv_traffic_manager.md#multiclient), only the TM-Server can tick. Similarly, in a [multiTM situation](adv_traffic_manager.md#multitm), only one TM-Server must tick. Use this method in the client that does the world tick, and right after setting the world to synchronous mode, to set which TM will be the master while in sync.  
+        Sets the Traffic Manager to [synchronous mode](adv_traffic_manager.md#synchronous-mode). In a [multiclient situation](adv_traffic_manager.md#multiclient), only the TM-Server can tick. Similarly, in a [multiTM situation](adv_traffic_manager.md#multitm), only one TM-Server must tick. Use this method in the client that does the world tick, and right after setting the world to synchronous mode, to set which TM will be the master while in sync.
       warning: >
-        If the server is set to synchronous mode, the TM <b>must</b> be set to synchronous mode too in the same client that does the tick. 
+        If the server is set to synchronous mode, the TM <b>must</b> be set to synchronous mode too in the same client that does the tick.
+    # --------------------------------------
+    - def_name: set_respawn_dormant_vehicles
+      params:
+      - param_name: mode_switch
+        type: bool
+        default: false
+      doc: >
+        If __True__, vehicles in large maps will respawn near the hero vehicle when they become dormant. Otherwise, they will stay dormant until they are within `actor_active_distance` of the hero vehicle again.
+    # --------------------------------------
+    - def_name: set_boundaries_respawn_dormant_vehicles
+      params:
+      - param_name: lower_bound
+        type: float
+        default: 25.0
+        doc: >
+          The minimum distance in meters from the hero vehicle that a dormant actor will be respawned.
+      - param_name: upper_bound
+        type: float
+        default: actor_active_distance
+        doc: >
+          The maximum distance in meters from the hero vehicle that a dormant actor will be respawned.
+      doc: >
+        Sets the upper and lower boundaries for dormant actors to be respawned near the hero vehicle.
+      warning: >
+        The `upper_bound` cannot be higher than the `actor_active_distance`. The `lower_bound` cannot be less than 25.
+    # --------------------------------------
+    - def_name: set_path
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          The actor that must follow the given path
+      - param_name: path
+        type: list
+        doc: >
+          The list of carla.Locations for the actor to follow
+      doc: >
+        Sets a list of locations for a vehicle to follow while controlled by the Traffic Manager. 
+      warning: >
+        Ensure that the road topology doesn't impede the given path.
+    # --------------------------------------
+    - def_name: set_route
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          The actor that must follow the given route instructions
+      - param_name: path
+        type: list
+        doc: >
+          The list of route instructions (string) for the vehicle to follow.
+      doc: >
+        Sets a list of route instructions for a vehicle to follow while controlled by the Traffic Manager. The possible route instructions are 'Left', 'Right', 'Straight'.
+      warning: >
+        Ensure that the lane topology doesn't impede the given route.
+    # --------------------------------------
+    - def_name: get_next_action
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          The actor that you wish to query. 
+      return: list of two elements - [Road option (string e.g. 'Left', 'Right', 'Straight'), Next waypoint (carla.Waypoint)]
+      doc: >
+        Returns the next known road option and waypoint that an actor controlled by the Traffic Manager will follow.  
+    # --------------------------------------
+    - def_name: get_all_actions
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          The actor that you wish to query. 
+      return: list of lists with each element as follows - [Road option (string e.g. 'Left', 'Right', 'Straight'), Next waypoint (carla.Waypoint)]
+      doc: >
+        Returns all known actions (i.e. road options and waypoints) that an actor controlled by the Traffic Manager will perform in its next steps.  
+    # --------------------------------------
+    - def_name: random_left_lanechange_percentage
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          The actor that you wish to query. 
+      - param_name: percentage
+        type: float
+        doc: >
+          The probability of lane change in percentage units (between 0 and 100) 
+      doc: >
+        Adjust probability that in each timestep the actor will perform a left lane change, dependent on lane change availability.
+    # --------------------------------------
+    - def_name: random_right_lanechange_percentage
+      params:
+      - param_name: actor
+        type: carla.Actor
+        doc: >
+          The actor that you wish to query. 
+      - param_name: percentage
+        type: float
+        doc: >
+          The probability of lane change in percentage units (between 0 and 100)
+      doc: >
+        Adjust probability that in each timestep the actor will perform a right lane change, dependent on lane change availability.
+    # --------------------------------------
+    - def_name: shut_down
+      doc: >
+        Shuts down the traffic manager. 
     # --------------------------------------
 
   - class_name: OpendriveGenerationParameters

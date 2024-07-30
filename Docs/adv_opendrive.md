@@ -1,6 +1,6 @@
-# OpenDRIVE standalone mode
+# ASAM OpenDRIVE standalone mode
 
-This feature allows users to ingest any OpenDRIVE file as a CARLA map out-of-the-box. In order to do so, the simulator will automatically generate a road mesh for actors to navigate through.  
+This feature allows users to ingest any ASAM OpenDRIVE file as a CARLA map out-of-the-box. In order to do so, the simulator will automatically generate a road mesh for actors to navigate through.  
 
 *   [__Overview__](#overview)  
 *   [__Run a standalone map__](#run-a-standalone-map)  
@@ -26,9 +26,9 @@ Traffic lights, stops and yields will be generated on the fly. Pedestrians will 
 ---
 ## Run a standalone map
 
-Open an OpenDRIVE file is just a matter of calling [`client.generate_opendrive_world()`](python_api.md#carla.Client.generate_opendrive_world) through the API. This will generate the new map, and block the simulation until it is ready. The method needs for two parameters.  
+Open an ASAM OpenDRIVE file is just a matter of calling [`client.generate_opendrive_world()`](python_api.md#carla.Client.generate_opendrive_world) through the API. This will generate the new map, and block the simulation until it is ready. The method needs for two parameters.  
 
-*   __`opendrive`__ is the content of the OpenDRIVE file parsed as a string.  
+*   __`opendrive`__ is the content of the ASAM OpenDRIVE file parsed as a string.  
 *   __`parameters`__ is a [carla.OpendriveGenerationParameters](python_api.md#carla.OpendriveGenerationParameters) containing settings for the generation of the mesh. __This argument is optional__.  
 
 	*   __`vertex_distance`__ *(default 2.0 meters)* — Distance between the vertices of the mesh. The bigger, the distance, the more inaccurate the mesh will be. However, if the distance is too small, the resulting mesh will be too heavy to work with.  
@@ -48,7 +48,10 @@ python3 config.py -x opendrive/TownBig.xodr
 ```
 
 !!! Important
-    __[client.generate_opendrive_world()](python_api.md#carla.Client.generate_opendrive_world)__ uses __content of the OpenDRIVE file parsed as string__. On the contrary, __`config.py`__ script needs __the path to the `.xodr` file__.
+    __[client.generate_opendrive_world()](python_api.md#carla.Client.generate_opendrive_world)__ uses __content of the OpenDRIVE file parsed as string__. On the contrary, __`config.py`__ script needs __the path to the `.xodr` file__. 
+
+!!! Note
+	If you experience the error	`opendrive could not be correctly parsed`, ensure that there are write permissions on the `CarlaUE4/Content/Carla/Maps/OpenDrive/` directory. This is required by the server to parse the `xodr` file correctly.
 
 ---
 ## Mesh generation
@@ -73,7 +76,7 @@ Doubts and suggestions in the forum.
 
 <div class="build-buttons">
 <p>
-<a href="https://forum.carla.org/" target="_blank" class="btn btn-neutral" title="Go to the CARLA forum">
+<a href="https://github.com/carla-simulator/carla/discussions/" target="_blank" class="btn btn-neutral" title="Go to the CARLA forum">
 CARLA forum</a>
 </p>
 </div>

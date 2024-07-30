@@ -41,7 +41,7 @@
     instance_variables:
     - var_name: CityScapesPalette
       doc: >
-        Converts the image to a segmentated map using tags provided by the blueprint library. Used by the [semantic segmentation camera](ref_sensors.md#semantic-segmentation-camera).
+        Converts the image to a segmented map using tags provided by the blueprint library. Used by the [semantic segmentation camera](ref_sensors.md#semantic-segmentation-camera).
     - var_name: Depth
       doc: >
         Converts the image to a linear depth map. Used by the [depth camera](ref_sensors.md#depth-camera).
@@ -55,7 +55,7 @@
   - class_name: CityObjectLabel
     # - DESCRIPTION ------------------------
     doc: >
-      Enum declaration that contains the different tags available to filter the bounding boxes returned by carla.World.get_level_bbs(). These values correspond to the [semantic tag](https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera) that the elements in the scene have.
+      Enum declaration that contains the different tags available to filter the bounding boxes returned by carla.World.get_level_bbs(). These values correspond to the [semantic tag](ref_sensors.md#semantic-segmentation-camera) that the elements in the scene have.
 
     # - PROPERTIES -------------------------
     instance_variables:
@@ -106,6 +106,8 @@
         Image width in pixels.
     - var_name: raw_data
       type: bytes
+      doc: >
+        Flattened array of pixel data, use reshape to create an image array.
     # - METHODS ----------------------------
     methods:
     - def_name: convert
@@ -150,6 +152,58 @@
     - def_name: __str__
     # --------------------------------------
 
+  - class_name: OpticalFlowImage
+    parent: carla.SensorData
+    # - DESCRIPTION ------------------------
+    doc: >
+      Class that defines an optical flow image of 2-Dimension float (32-bit) vectors representing the optical flow detected in the field of view. The components of the vector represents the displacement of an object in the image plane. Each component outputs values in the normalized range [-2,2] which scales to [-2 size, 2 size] with size being the total resolution in the corresponding component.
+    # - PROPERTIES -------------------------
+    instance_variables:
+    - var_name: fov
+      type: float
+      var_units: degrees
+      doc: >
+        Horizontal field of view of the image.
+    - var_name: height
+      type: int
+      doc: >
+        Image height in pixels.
+    - var_name: width
+      type: int
+      doc: >
+        Image width in pixels.
+    - var_name: raw_data
+      type: bytes
+      doc: >
+        Flattened array of pixel data, use reshape to create an image array.
+    # - METHODS ----------------------------
+    methods:
+    - def_name: get_color_coded_flow
+      return: carla.Image
+      doc: >
+        Visualization helper. Converts the optical flow image to an RGB image.
+    # --------------------------------------
+    - def_name: __getitem__
+      params:
+      - param_name: pos
+        type: int
+    # --------------------------------------
+    - def_name: __iter__
+      doc: >
+        Iterate over the carla.OpticalFlowPixel that form the image. 
+    # --------------------------------------
+    - def_name: __len__
+    # --------------------------------------
+    - def_name: __setitem__
+      params:
+      - param_name: pos
+        type: int
+      - param_name: color
+        type: carla.Color
+    # --------------------------------------
+    - def_name: __str__
+    # --------------------------------------
+
   - class_name: LidarMeasurement
     parent: carla.SensorData
     # - DESCRIPTION ------------------------
@@ -161,15 +215,17 @@
       type: int
       doc: >
         Number of lasers shot.
+    # --------------------------------------
     - var_name: horizontal_angle
       type: float
       var_units: radians
       doc: >
         Horizontal angle the LIDAR is rotated at the time of the measurement.
+    # --------------------------------------
     - var_name: raw_data
       type: bytes
       doc: >
-        Received list of 4D points. Each point consists of [x,y,z] coordiantes plus the intensity computed for that point.
+        Received list of 4D points. Each point consists of [x,y,z] coordinates plus the intensity computed for that point.
     # - METHODS ----------------------------
     methods:
     - def_name: save_to_disk
@@ -207,10 +263,11 @@
     - def_name: __str__
     # --------------------------------------
 
+
   - class_name: LidarDetection
     # - DESCRIPTION ------------------------
     doc: >
-      Data contained inside a carla.LidarMeasurement. Each of these represents one of the points in the cloud with its location and its asociated intensity.
+      Data contained inside a carla.LidarMeasurement. Each of these represents one of the points in the cloud with its location and its associated intensity.
     # - PROPERTIES -------------------------
     instance_variables:
     - var_name: point
@@ -239,11 +296,13 @@
       type: int
       doc: >
         Number of lasers shot.
+    # --------------------------------------
     - var_name: horizontal_angle
       type: float
       var_units: radians
       doc: >
         Horizontal angle the LIDAR is rotated at the time of the measurement.
+    # --------------------------------------
     - var_name: raw_data
       type: bytes
       doc: >
@@ -320,7 +379,7 @@
     parent: carla.SensorData
     # - DESCRIPTION ------------------------
     doc: >
-      Class that defines a collision data for <b>sensor.other.collision</b>. The sensor creates one of this for every collision detected which may be many for one simulation step. Learn more about this [here](ref_sensors.md#collision-detector).
+      Class that defines a collision data for <b>sensor.other.collision</b>. The sensor creates one of these for every collision detected. Each collision sensor produces one collision event per collision per frame. Multiple collision events may be produced in a single frame by collisions with multiple other actors. Learn more about this [here](ref_sensors.md#collision-detector).
     # - PROPERTIES -------------------------
     instance_variables:
     - var_name: actor
@@ -558,6 +617,7 @@
       Part of the data contained inside a carla.RssResponse describing the state of the vehicle. The parameters include its current dynamics, and how it is heading regarding the target route.
     # - PROPERTIES -------------------------
     instance_variables:
+    ## ** Missing timestamp and time_since_epoch_check_start_ms
     - var_name: ego_speed
       type: <a href="https://ad-map-access.readthedocs.io/en/latest/ad_physics/apidoc/html/classad_1_1physics_1_1Speed.html">ad.physics.Speed</a>
       doc: >
@@ -741,7 +801,7 @@
   - class_name: DVSEventArray
     # - DESCRIPTION ------------------------
     doc: >
-      Class that defines a stream of events in [carla.DVSEvent](#carla.DVSEvent). Such stream is an array of arbitrary size depending on the number of events. This class also stores the field of view, the height and width of the image and the timestamp from convenience. Learn more about them [here](ref_sensors.md).
+      Class that defines a stream of events in carla.DVSEvent. Such stream is an array of arbitrary size depending on the number of events. This class also stores the field of view, the height and width of the image and the timestamp from convenience. Learn more about them [here](ref_sensors.md).
     # - PROPERTIES -------------------------
     instance_variables:
     - var_name: fov
@@ -808,4 +868,71 @@
     # --------------------------------------
     - def_name: __str__
     # --------------------------------------
+    
+  - class_name: GBufferTextureID
+    # - DESCRIPTION ------------------------
+    doc: >
+      Defines the identifiers of each GBuffer texture (See the method `carla.Sensor.listen_to_gbuffer`).
+    # - PROPERTIES -------------------------
+    instance_variables:
+    - var_name: SceneColor
+      doc: >
+        The texture "SceneColor" contains the final color of the image.
+    - var_name: SceneDepth
+      doc: >
+        The texture "SceneDepth" contains the depth buffer - linear in world units.
+    - var_name: SceneStencil
+      doc: >
+        The texture "SceneStencil" contains the stencil buffer.
+    - var_name: GBufferA
+      doc: >
+        The texture "GBufferA" contains the world-space normal vectors in the RGB channels. The alpha channel contains "per-object data".
+    - var_name: GBufferB
+      doc: >
+        The texture "GBufferB" contains the metallic, specular and roughness in the RGB channels, respectively. The alpha channel contains a mask where the lower 4 bits indicate the shading model and the upper 4 bits contain the selective output mask.
+    - var_name: GBufferC
+      doc: >
+        The texture "GBufferC" contains the diffuse color in the RGB channels, with the indirect irradiance in the alpha channel.<br>
+        If static lightning is not allowed, the alpha channel will contain the ambient occlusion instead.
+    - var_name: GBufferD
+      doc: >
+        The contents of the "GBufferD" varies depending on the rendered object's material shading model (GBufferB):<br>
+          - MSM_Subsurface (2), MSM_PreintegratedSkin (3), MSM_TwoSidedFoliage (6):<br>
+            RGB: Subsurface color.<br>
+            A: Opacity.<br>
+          - MSM_ClearCoat (4):<br>
+            R: Clear coat.<br>
+            G: Roughness.<br>
+          - MSM_SubsurfaceProfile (5):<br>
+            RGB: Subsurface profile.<br>
+          - MSM_Hair (7):<br>
+            RG: World normal.<br>
+            B: Backlit value.<br>
+          - MSM_Cloth (8):<br>
+            RGB: Subsurface color.<br>
+            A: Cloth value.<br>
+          - MSM_Eye (9):<br>
+            RG: Eye tangent.<br>
+            B: Iris mask.<br>
+            A: Iris distance.
+    - var_name: GBufferE
+      doc: >
+        The texture "GBufferE" contains the precomputed shadow factors in the RGBA channels. This texture is unavailable if the selective output mask (GBufferB) does not have its 4th bit set.
+    - var_name: GBufferF
+      doc: >
+        The texture "GBufferF" contains the world-space tangent in the RGB channels and the anisotropy in the alpha channel. This texture is unavailable if the selective output mask (GBufferB) does not have its 5th bit set.
+    - var_name: Velocity
+      doc: >
+        The texture "Velocity" contains the screen-space velocity of the scene objects.
+    - var_name: SSAO
+      doc: >
+        The texture "SSAO" contains the screen-space ambient occlusion texture.
+    - var_name: CustomDepth
+      doc: >
+        The texture "CustomDepth" contains the Unreal Engine custom depth data.
+    - var_name: CustomStencil
+      doc: >
+        The texture "CustomStencil" contains the Unreal Engine custom stencil data.
+    # --------------------------------------
+
 ...

@@ -19,6 +19,9 @@ namespace carla {
 namespace traffic_manager {
 
 using ActorPtr = carla::SharedPtr<carla::client::Actor>;
+using Path = std::vector<cg::Location>;
+using Route = std::vector<uint8_t>;
+
 
 /// The function of this class is to integrate all the various stages of
 /// the traffic manager appropriately using messengers.
@@ -54,9 +57,23 @@ public:
   /// If less than 0, it's a % increase.
   void SetPercentageSpeedDifference(const ActorPtr &actor, const float percentage);
 
+  /// Method to set a lane offset displacement from the center line.
+  /// Positive values imply a right offset while negative ones mean a left one.
+  void SetLaneOffset(const ActorPtr &actor, const float offset);
+
+  /// Set a vehicle's exact desired velocity.
+  void SetDesiredSpeed(const ActorPtr &actor, const float value);
+
   /// Method to set a global % decrease in velocity with respect to the speed limit.
   /// If less than 0, it's a % increase.
   void SetGlobalPercentageSpeedDifference(float const percentage);
+
+  /// Method to set a global lane offset displacement from the center line.
+  /// Positive values imply a right offset while negative ones mean a left one.
+  void SetGlobalLaneOffset(float const offset);
+
+  /// Method to set the automatic management of the vehicle lights
+  void SetUpdateVehicleLights(const ActorPtr &actor, const bool do_update);
 
   /// Method to set collision detection rules between vehicles.
   void SetCollisionDetection(const ActorPtr &reference_actor, const ActorPtr &other_actor, const bool detect_collision);
@@ -93,8 +110,14 @@ public:
   /// Method to set Tick timeout for synchronous execution.
   void SetSynchronousModeTimeOutInMiliSecond(double time);
 
-  /// Method to set probabilistic preference to keep on the right lane.
+  /// Method to set % to keep on the right lane.
   void SetKeepRightPercentage(const ActorPtr &actor, const float percentage);
+
+  /// Method to set % to randomly do a left lane change.
+  void SetRandomLeftLaneChangePercentage(const ActorPtr &actor, const float percentage);
+
+  /// Method to set % to randomly do a right lane change.
+  void SetRandomRightLaneChangePercentage(const ActorPtr &actor, const float percentage);
 
   /// Method to set hybrid physics mode.
   void SetHybridPhysicsMode(const bool mode_switch);
@@ -104,6 +127,41 @@ public:
 
   /// Method to set Open Street Map mode.
   void SetOSMMode(const bool mode_switch);
+
+  /// Method to set our own imported path.
+  void SetCustomPath(const ActorPtr &actor, const Path path, const bool empty_buffer);
+
+  /// Method to remove a path.
+  void RemoveUploadPath(const ActorId &actor_id, const bool remove_path);
+
+  /// Method to update an already set path.
+  void UpdateUploadPath(const ActorId &actor_id, const Path path);
+
+  /// Method to set our own imported route.
+  void SetImportedRoute(const ActorPtr &actor, const Route route, const bool empty_buffer);
+
+  /// Method to remove a route.
+  void RemoveImportedRoute(const ActorId &actor_id, const bool remove_path);
+
+  /// Method to update an already set route.
+  void UpdateImportedRoute(const ActorId &actor_id, const Route route);
+
+  /// Method to set automatic respawn of dormant vehicles.
+  void SetRespawnDormantVehicles(const bool mode_switch);
+
+  // Method to set boundaries to respawn of dormant vehicles.
+  void SetBoundariesRespawnDormantVehicles(const float lower_bound, const float upper_bound);
+
+  // Method to set boundaries to respawn of dormant vehicles.
+  void SetMaxBoundaries(const float lower, const float upper);
+
+  virtual void ShutDown();
+
+  /// Method to get the vehicle's next action.
+  Action GetNextAction(const ActorId &actor_id);
+
+  /// Method to get the vehicle's action buffer.
+  ActionBuffer GetActionBuffer(const ActorId &actor_id);
 
   /// Method to provide synchronous tick
   bool SynchronousTick();

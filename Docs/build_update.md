@@ -13,7 +13,7 @@ To post unexpected issues, doubts or suggestions, feel free to login in the CARL
 
 <div class="build-buttons">
 <p>
-<a href="https://forum.carla.org/" target="_blank" class="btn btn-neutral" title="Go to the latest CARLA release">
+<a href="https://github.com/carla-simulator/carla/discussions/" target="_blank" class="btn btn-neutral" title="Go to the latest CARLA release">
 CARLA forum</a>
 </p>
 </div>
@@ -69,9 +69,25 @@ Releases are listed in __Development__ in the CARLA repository. There is also a 
 </p>
 
 <p>
-<a href="http://carla-releases.s3.amazonaws.com/Linux/Dev/CARLA_Latest.tar.gz" target="_blank" class="btn btn-neutral" title="Go to the nightly CARLA build">
-<span class="icon fa-cloud-download"></span> Get the nightly build</a>
+<a href="https://carla-releases.s3.us-east-005.backblazeb2.com/Linux/Dev/CARLA_Latest.tar.gz" target="_blank" class="btn btn-neutral" title="Go to the linux nightly CARLA build">
+<span class="icon fa-cloud-download"></span> Get the linux nightly build</a>
 </p>
+
+<p>
+<a href="https://carla-releases.s3.us-east-005.backblazeb2.com/Linux/Dev/AdditionalMaps_Latest.tar.gz" target="_blank" class="btn btn-neutral" title="Go to the linux nightly AdditionalMaps build">
+<span class="icon fa-cloud-download"></span> Get the linux nightly build additional maps</a>
+</p>
+
+<p>
+<a href="https://carla-releases.s3.us-east-005.backblazeb2.com/Windows/Dev/CARLA_Latest.zip" target="_blank" class="btn btn-neutral" title="Go to the windows nightly CARLA build">
+<span class="icon fa-cloud-download"></span> Get the windows nightly build</a>
+</p>
+
+<p>
+<a href="https://carla-releases.s3.us-east-005.backblazeb2.com/Windows/Dev/AdditionalMaps_Latest.zip" target="_blank" class="btn btn-neutral" title="Go to the windows nightly AdditionalMaps build">
+<span class="icon fa-cloud-download"></span> Get the windows nightly build additional maps</a>
+</p>
+
 </div>
 
 ---

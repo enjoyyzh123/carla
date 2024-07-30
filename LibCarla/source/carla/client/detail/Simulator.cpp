@@ -11,11 +11,13 @@
 #include "carla/Logging.h"
 #include "carla/RecurrentSharedFuture.h"
 #include "carla/client/BlueprintLibrary.h"
+#include "carla/client/FileTransfer.h"
 #include "carla/client/Map.h"
 #include "carla/client/Sensor.h"
 #include "carla/client/TimeoutException.h"
 #include "carla/client/WalkerAIController.h"
 #include "carla/client/detail/ActorFactory.h"
+#include "carla/client/detail/WalkerNavigation.h"
 #include "carla/trafficmanager/TrafficManager.h"
 #include "carla/sensor/Deserializer.h"
 
@@ -125,22 +127,79 @@ namespace detail {
   // -- Access to current episode ----------------------------------------------
   // ===========================================================================
 
-  EpisodeProxy Simulator::GetCurrentEpisode() {
+  void Simulator::GetReadyCurrentEpisode() {
     if (_episode == nullptr) {
       ValidateVersions(_client);
-      _episode = std::make_shared<Episode>(_client);
+      _episode = std::make_shared<Episode>(_client, std::weak_ptr<Simulator>(shared_from_this()));
       _episode->Listen();
       if (!GetEpisodeSettings().synchronous_mode) {
         WaitForTick(_client.GetTimeout());
       }
-      _light_manager->SetEpisode(EpisodeProxy{shared_from_this()});
+      _light_manager->SetEpisode(WeakEpisodeProxy{shared_from_this()});
     }
+  }
+EpisodeProxy Simulator::GetCurrentEpisode() {
+    GetReadyCurrentEpisode();
     return EpisodeProxy{shared_from_this()};
   }
 
-  SharedPtr<Map> Simulator::GetCurrentMap() {
-    return MakeShared<Map>(_client.GetMapInfo());
+  bool Simulator::ShouldUpdateMap(rpc::MapInfo& map_info) {
+    if (!_cached_map) {
+      return true;
+    }
+    if (map_info.name != _cached_map->GetName() ||
+        _open_drive_file.size() != _cached_map->GetOpenDrive().size()) {
+      return true;
+    }
+    return false;
   }
+
+  SharedPtr<Map> Simulator::GetCurrentMap() {
+    DEBUG_ASSERT(_episode != nullptr);
+    if (!_cached_map || _episode->HasMapChangedSinceLastCall()) {
+      rpc::MapInfo map_info = _client.GetMapInfo();
+      std::string map_name;
+      std::string map_base_path;
+      bool fill_base_string = false;
+      for (int i = map_info.name.size() - 1; i >= 0; --i) {
+        if (fill_base_string == false && map_info.name[i] != '/') {
+          map_name += map_info.name[i];
+        } else {
+          map_base_path += map_info.name[i];
+          fill_base_string = true;
+        }
+      }
+      std::reverse(map_name.begin(), map_name.end());
+      std::reverse(map_base_path.begin(), map_base_path.end());
+      std::string XODRFolder = map_base_path + "/OpenDrive/" + map_name + ".xodr";
+      if (FileTransfer::FileExists(XODRFolder) == false) _client.GetRequiredFiles();
+      _open_drive_file = _client.GetMapData();
+      _cached_map = MakeShared<Map>(map_info, _open_drive_file);
+    }
+
+    return _cached_map;
+  }
+
+  // ===========================================================================
+  // -- Required files ---------------------------------------------------------
+  // ===========================================================================
+
+
+    bool Simulator::SetFilesBaseFolder(const std::string &path) {
+      return _client.SetFilesBaseFolder(path);
+    }
+
+    std::vector<std::string> Simulator::GetRequiredFiles(const std::string &folder, const bool download) const {
+      return _client.GetRequiredFiles(folder, download);
+    }
+
+    void Simulator::RequestFile(const std::string &name) const {
+      _client.RequestFile(name);
+    }
+
+    std::vector<uint8_t> Simulator::GetCacheFile(const std::string &name, const bool request_otherwise) const {
+      return _client.GetCacheFile(name, request_otherwise);
+    }
 
   // ===========================================================================
   // -- Tick -------------------------------------------------------------------
@@ -148,6 +207,10 @@ namespace detail {
 
   WorldSnapshot Simulator::WaitForTick(time_duration timeout) {
     DEBUG_ASSERT(_episode != nullptr);
+
+    // tick pedestrian navigation
+    NavigationTick();
+
     auto result = _episode->WaitForState(timeout);
     if (!result.has_value()) {
       throw_exception(TimeoutException(_client.GetEndpoint(), timeout));
@@ -157,7 +220,14 @@ namespace detail {
 
   uint64_t Simulator::Tick(time_duration timeout) {
     DEBUG_ASSERT(_episode != nullptr);
+
+    // tick pedestrian navigation
+    NavigationTick();
+
+    // send tick command
     const auto frame = _client.SendTickCue();
+
+    // waits until new episode is received
     bool result = SynchronizeFrame(frame, *_episode, timeout);
     if (!result) {
       throw_exception(TimeoutException(_client.GetEndpoint(), timeout));
@@ -215,6 +285,19 @@ namespace detail {
   // -- AI ---------------------------------------------------------------------
   // ===========================================================================
 
+  std::shared_ptr<WalkerNavigation> Simulator::GetNavigation() {
+    DEBUG_ASSERT(_episode != nullptr);
+    auto nav = _episode->CreateNavigationIfMissing();
+    return nav;
+  }
+
+  // tick pedestrian navigation
+  void Simulator::NavigationTick() {
+    DEBUG_ASSERT(_episode != nullptr);
+    auto nav = _episode->CreateNavigationIfMissing();
+    nav->Tick(_episode);
+  }
+
   void Simulator::RegisterAIController(const WalkerAIController &controller) {
     auto walker = controller.GetParent();
     if (walker == nullptr) {
@@ -222,9 +305,8 @@ namespace detail {
       return;
     }
     DEBUG_ASSERT(_episode != nullptr);
-    auto navigation = _episode->CreateNavigationIfMissing();
-    DEBUG_ASSERT(navigation != nullptr);
-    navigation->RegisterWalker(walker->GetId(), controller.GetId());
+    auto nav = _episode->CreateNavigationIfMissing();
+    nav->RegisterWalker(walker->GetId(), controller.GetId());
   }
 
   void Simulator::UnregisterAIController(const WalkerAIController &controller) {
@@ -234,23 +316,26 @@ namespace detail {
       return;
     }
     DEBUG_ASSERT(_episode != nullptr);
-    auto navigation = _episode->CreateNavigationIfMissing();
-    DEBUG_ASSERT(navigation != nullptr);
-    navigation->UnregisterWalker(walker->GetId(), controller.GetId());
+    auto nav = _episode->CreateNavigationIfMissing();
+    nav->UnregisterWalker(walker->GetId(), controller.GetId());
   }
 
   boost::optional<geom::Location> Simulator::GetRandomLocationFromNavigation() {
     DEBUG_ASSERT(_episode != nullptr);
-    auto navigation = _episode->CreateNavigationIfMissing();
-    DEBUG_ASSERT(navigation != nullptr);
-    return navigation->GetRandomLocation();
+    auto nav = _episode->CreateNavigationIfMissing();
+    return nav->GetRandomLocation();
   }
 
   void Simulator::SetPedestriansCrossFactor(float percentage) {
     DEBUG_ASSERT(_episode != nullptr);
-    auto navigation = _episode->CreateNavigationIfMissing();
-    DEBUG_ASSERT(navigation != nullptr);
-    navigation->SetPedestriansCrossFactor(percentage);
+    auto nav = _episode->CreateNavigationIfMissing();
+    nav->SetPedestriansCrossFactor(percentage);
+  }
+
+  void Simulator::SetPedestriansSeed(unsigned int seed) {
+    DEBUG_ASSERT(_episode != nullptr);
+    auto nav = _episode->CreateNavigationIfMissing();
+    nav->SetPedestriansSeed(seed);
   }
 
   // ===========================================================================
@@ -317,12 +402,63 @@ namespace detail {
         });
   }
 
-  void Simulator::UnSubscribeFromSensor(const Sensor &sensor) {
+  void Simulator::UnSubscribeFromSensor(Actor &sensor) {
     _client.UnSubscribeFromStream(sensor.GetActorDescription().GetStreamToken());
+    // If in the future we need to unsubscribe from each gbuffer individually, it should be done here.
+  }
+
+  void Simulator::EnableForROS(const Sensor &sensor) {
+    _client.EnableForROS(sensor.GetActorDescription().GetStreamToken());
+  }
+
+  void Simulator::DisableForROS(const Sensor &sensor) {
+    _client.DisableForROS(sensor.GetActorDescription().GetStreamToken());
+  }
+
+  bool Simulator::IsEnabledForROS(const Sensor &sensor) {
+    return _client.IsEnabledForROS(sensor.GetActorDescription().GetStreamToken());
+  }
+
+  void Simulator::SubscribeToGBuffer(
+      Actor &actor,
+      uint32_t gbuffer_id,
+      std::function<void(SharedPtr<sensor::SensorData>)> callback) {
+    _client.SubscribeToGBuffer(actor.GetId(), gbuffer_id,
+        [cb=std::move(callback), ep=WeakEpisodeProxy{shared_from_this()}](auto buffer) {
+          auto data = sensor::Deserializer::Deserialize(std::move(buffer));
+          data->_episode = ep.TryLock();
+          cb(std::move(data));
+        });
+  }
+
+  void Simulator::UnSubscribeFromGBuffer(Actor &actor, uint32_t gbuffer_id) {
+    _client.UnSubscribeFromGBuffer(actor.GetId(), gbuffer_id);
   }
 
   void Simulator::FreezeAllTrafficLights(bool frozen) {
     _client.FreezeAllTrafficLights(frozen);
+  }
+
+  // =========================================================================
+  /// -- Texture updating operations
+  // =========================================================================
+
+  void Simulator::ApplyColorTextureToObjects(
+      const std::vector<std::string> &objects_name,
+      const rpc::MaterialParameter& parameter,
+      const rpc::TextureColor& Texture) {
+    _client.ApplyColorTextureToObjects(objects_name, parameter, Texture);
+  }
+
+  void Simulator::ApplyColorTextureToObjects(
+      const std::vector<std::string> &objects_name,
+      const rpc::MaterialParameter& parameter,
+      const rpc::TextureFloatColor& Texture) {
+    _client.ApplyColorTextureToObjects(objects_name, parameter, Texture);
+  }
+
+  std::vector<std::string> Simulator::GetNamesOfAllObjects() const {
+    return _client.GetNamesOfAllObjects();
   }
 
 } // namespace detail

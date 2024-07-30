@@ -8,14 +8,23 @@
 
 #include "WheeledVehicle.h"
 
+#include "Vehicle/AckermannController.h"
+#include "Vehicle/AckermannControllerSettings.h"
 #include "Vehicle/CarlaWheeledVehicleState.h"
+#include "Vehicle/VehicleAckermannControl.h"
 #include "Vehicle/VehicleControl.h"
 #include "Vehicle/VehicleLightState.h"
 #include "Vehicle/VehicleInputPriority.h"
 #include "Vehicle/VehiclePhysicsControl.h"
 #include "VehicleVelocityControl.h"
 #include "WheeledVehicleMovementComponent4W.h"
+#include "WheeledVehicleMovementComponentNW.h"
+#include "VehicleAnimInstance.h"
+#include "PhysicsEngine/PhysicsConstraintComponent.h"
+#include "MovementComponents/BaseCarlaMovementComponent.h"
 
+
+#include "FoliageInstancedStaticMeshComponent.h"
 #include "CoreMinimal.h"
 
 //-----CARSIM--------------------------------
@@ -24,9 +33,39 @@
 #endif
 //-------------------------------------------
 
+#include <utility>
+
+#include "carla/rpc/VehicleFailureState.h"
 #include "CarlaWheeledVehicle.generated.h"
 
 class UBoxComponent;
+
+UENUM()
+enum class EVehicleWheelLocation : uint8 {
+
+  FL_Wheel = 0,
+  FR_Wheel = 1,
+  BL_Wheel = 2,
+  BR_Wheel = 3,
+  ML_Wheel = 4,
+  MR_Wheel = 5,
+  //Use for bikes and bicycles
+  Front_Wheel = 0,
+  Back_Wheel = 1,
+};
+
+/// Type of door to open/close
+// When adding new door types, make sure that All is the last one.
+UENUM(BlueprintType)
+enum class EVehicleDoor : uint8 {
+  FL = 0,
+  FR = 1,
+  RL = 2,
+  RR = 3,
+  Hood = 4,
+  Trunk = 5,
+  All = 6
+};
 
 /// Base class for CARLA wheeled vehicles.
 UCLASS()
@@ -56,6 +95,13 @@ public:
   const FVehicleControl &GetVehicleControl() const
   {
     return LastAppliedControl;
+  }
+
+  /// Vehicle Ackermann control currently applied to this vehicle.
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  const FVehicleAckermannControl &GetVehicleAckermannControl() const
+  {
+    return LastAppliedAckermannControl;
   }
 
   /// Transform of the vehicle. Location is shifted so it matches center of the
@@ -120,13 +166,32 @@ public:
   FVehiclePhysicsControl GetVehiclePhysicsControl() const;
 
   UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  FAckermannControllerSettings GetAckermannControllerSettings() const {
+    return AckermannController.GetSettings();
+  }
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void RestoreVehiclePhysicsControl();
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
   FVehicleLightState GetVehicleLightState() const;
 
   void ApplyVehiclePhysicsControl(const FVehiclePhysicsControl &PhysicsControl);
 
+  void ApplyAckermannControllerSettings(const FAckermannControllerSettings &AckermannControllerSettings) {
+    return AckermannController.ApplySettings(AckermannControllerSettings);
+  }
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void SetSimulatePhysics(bool enabled);
+
   void SetWheelCollision(UWheeledVehicleMovementComponent4W *Vehicle4W, const FVehiclePhysicsControl &PhysicsControl);
 
+  void SetWheelCollisionNW(UWheeledVehicleMovementComponentNW *VehicleNW, const FVehiclePhysicsControl &PhysicsControl);
+
   void SetVehicleLightState(const FVehicleLightState &LightState);
+
+  void SetFailureState(const carla::rpc::VehicleFailureState &FailureState);
 
   UFUNCTION(BlueprintNativeEvent)
   bool IsTwoWheeledVehicle();
@@ -144,6 +209,11 @@ public:
   UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
   void ApplyVehicleControl(const FVehicleControl &Control, EVehicleInputPriority Priority)
   {
+    if (bAckermannControlActive) {
+      AckermannController.Reset();
+    }
+    bAckermannControlActive = false;
+
     if (InputControl.Priority <= Priority)
     {
       InputControl.Control = Control;
@@ -152,10 +222,26 @@ public:
   }
 
   UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void ApplyVehicleAckermannControl(const FVehicleAckermannControl &AckermannControl, EVehicleInputPriority Priority)
+  {
+    bAckermannControlActive = true;
+    LastAppliedAckermannControl = AckermannControl;
+    AckermannController.SetTargetPoint(AckermannControl);
+  }
+
+  bool IsAckermannControlActive() const
+  {
+    return bAckermannControlActive;
+  }
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
   void ActivateVelocityControl(const FVector &Velocity);
 
   UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
   void DeactivateVelocityControl();
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void ShowDebugTelemetry(bool Enabled);
 
   /// @todo This function should be private to AWheeledVehicleAIController.
   void FlushVehicleControl();
@@ -204,6 +290,14 @@ public:
 
   void SetWheelsFrictionScale(TArray<float> &WheelsFrictionScale);
 
+  void SetCarlaMovementComponent(UBaseCarlaMovementComponent* MoementComponent);
+
+  template<typename T = UBaseCarlaMovementComponent>
+  T* GetCarlaMovementComponent() const
+  {
+    return Cast<T>(BaseMovementComponent);
+  }
+
   /// @}
   // ===========================================================================
   /// @name Overriden from AActor
@@ -213,6 +307,7 @@ public:
 protected:
 
   virtual void BeginPlay() override;
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason);
 
   UFUNCTION(BlueprintImplementableEvent)
   void RefreshLightState(const FVehicleLightState &VehicleLightState);
@@ -220,14 +315,20 @@ protected:
   UFUNCTION(BlueprintCallable, CallInEditor)
   void AdjustVehicleBounds();
 
+  UPROPERTY(Category="Door Animation", EditAnywhere, BlueprintReadWrite)
+  TArray<FName> ConstraintComponentNames;
+
+  UPROPERTY(Category="Door Animation", EditAnywhere, BlueprintReadWrite)
+  float DoorOpenStrength = 100.0f;
+
+  UFUNCTION(BlueprintCallable, CallInEditor)
+  void ResetConstraints();
+
 private:
 
   /// Current state of the vehicle controller (for debugging purposes).
   UPROPERTY(Category = "AI Controller", VisibleAnywhere)
   ECarlaWheeledVehicleState State = ECarlaWheeledVehicleState::UNKNOWN;
-
-  UPROPERTY(Category = "CARLA Wheeled Vehicle", EditAnywhere)
-  UBoxComponent *VehicleBounds;
 
   UPROPERTY(Category = "CARLA Wheeled Vehicle", EditAnywhere)
   UVehicleVelocityControl* VelocityControl;
@@ -241,68 +342,137 @@ private:
   InputControl;
 
   FVehicleControl LastAppliedControl;
+  FVehicleAckermannControl LastAppliedAckermannControl;
+  FVehiclePhysicsControl LastPhysicsControl;
 
+  bool bAckermannControlActive = false;
+  FAckermannController AckermannController;
+
+  float RolloverBehaviorForce = 0.35;
+  int RolloverBehaviorTracker = 0;
+  float RolloverFlagTime = 5.0f;
+
+  carla::rpc::VehicleFailureState FailureState = carla::rpc::VehicleFailureState::None;
+
+public:
+  UPROPERTY(Category = "CARLA Wheeled Vehicle", EditDefaultsOnly)
+  float DetectionSize { 750.0f };
+
+  UPROPERTY(Category = "CARLA Wheeled Vehicle", VisibleAnywhere, BlueprintReadOnly)
+  FBox FoliageBoundingBox;
+
+  UPROPERTY(Category = "CARLA Wheeled Vehicle", EditAnywhere)
+  UBoxComponent *VehicleBounds;
+
+  UFUNCTION()
+  FBox GetDetectionBox() const;
+
+  UFUNCTION()
+  float GetDetectionSize() const;
+
+  UFUNCTION()
+  void UpdateDetectionBox();
+
+  UFUNCTION()
+  const TArray<int32> GetFoliageInstancesCloseToVehicle(const UInstancedStaticMeshComponent* Component) const;
+
+  UFUNCTION(BlueprintCallable)
+  void DrawFoliageBoundingBox() const;
+
+  UFUNCTION()
+  FBoxSphereBounds GetBoxSphereBounds() const;
+
+  UFUNCTION()
+  bool IsInVehicleRange(const FVector& Location) const;
+
+  /// Set the rotation of the car wheels indicated by the user
+  /// 0 = FL_VehicleWheel, 1 = FR_VehicleWheel, 2 = BL_VehicleWheel, 3 = BR_VehicleWheel
+  /// NOTE : This is purely aesthetic. It will not modify the physics of the car in any way
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void SetWheelSteerDirection(EVehicleWheelLocation WheelLocation, float AngleInDeg);
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  float GetWheelSteerAngle(EVehicleWheelLocation WheelLocation);
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void OpenDoor(const EVehicleDoor DoorIdx);
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void CloseDoor(const EVehicleDoor DoorIdx);
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void OpenDoorPhys(const EVehicleDoor DoorIdx);
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void CloseDoorPhys(const EVehicleDoor DoorIdx);
+
+  virtual FVector GetVelocity() const override;
 
 //-----CARSIM--------------------------------
-public:
-
-  // Enables carsim once enabled it won't turn back to UE4 physics simulation
-  // (for some reason the UE4 physics get meesed up after enabling carsim)
-  UFUNCTION(Category="CARLA Wheeled Vehicle", BlueprintCallable)
-  void EnableCarSim(FString SimfilePath = "");
-
-  // Enables usage of carsim terrain
-  UFUNCTION(Category="CARLA Wheeled Vehicle", BlueprintCallable)
-  void UseCarSimRoad(bool bEnabled);
-
-  #ifdef WITH_CARSIM
-  virtual FVector GetVelocity() const override;
-  #endif
-
-  UFUNCTION(Category="CARLA Wheeled Vehicle", BlueprintPure)
-  bool IsCarSimEnabled() const;
-
-  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason);
-
-private:
-
-  // On car mesh hit, only works when carsim is enabled
-  UFUNCTION()
-  void OnCarSimHit(AActor *Actor,
-      AActor *OtherActor,
-      FVector NormalImpulse,
-      const FHitResult &Hit);
-
-  // On car mesh overlap, only works when carsim is enabled
-  // (this event triggers when overlapping with static environment)
-  UFUNCTION()
-  void OnCarSimOverlap(UPrimitiveComponent* OverlappedComponent,
-      AActor* OtherActor,
-      UPrimitiveComponent* OtherComp,
-      int32 OtherBodyIndex,
-      bool bFromSweep,
-      const FHitResult & SweepResult);
-
-  UFUNCTION()
-  void SwitchToUE4Physics();
-
-  UFUNCTION()
-  void RevertToCarSimPhysics();
-
-  UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere)
-  bool bCarSimEnabled = false;
-
   UPROPERTY(Category="CARLA Wheeled Vehicle", EditAnywhere)
   float CarSimOriginOffset = 150.f;
+//-------------------------------------------
+
+  UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere)
+  bool bIsNWVehicle = false;
+
+  void SetRolloverFlag();
+
+  carla::rpc::VehicleFailureState GetFailureState() const;
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  static FRotator GetPhysicsConstraintAngle(UPhysicsConstraintComponent* Component);
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  static void SetPhysicsConstraintAngle(
+      UPhysicsConstraintComponent*Component, const FRotator &NewAngle);
+ 
+private:
+
+  UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere)
+  bool bPhysicsEnabled = true;
 
   // Small workarround to allow optional CarSim plugin usage
   UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-  UMovementComponent * ExternalMovementComponent;
+  UBaseCarlaMovementComponent * BaseMovementComponent = nullptr;
 
-  #ifdef WITH_CARSIM
-  AActor* OffsetActor;
-  // Casted version of ExternalMovementComponent
-  UCarSimMovementComponent * CarSimMovementComponent;
-  #endif
-  //-------------------------------------------
+  UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+  TArray<UPhysicsConstraintComponent*> ConstraintsComponents;
+
+  UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+  TMap<UPhysicsConstraintComponent*, UPrimitiveComponent*> ConstraintDoor;
+
+  // container of the initial transform of the door, used to reset its position
+  UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+  TMap<UPrimitiveComponent*, FTransform> DoorComponentsTransform;
+
+  UPROPERTY(Category="CARLA Wheeled Vehicle", VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+  TMap<UPrimitiveComponent*, UPhysicsConstraintComponent*> CollisionDisableConstraints;
+
+  /// Rollovers tend to have too much angular velocity, resulting in the vehicle doing a full 360º flip.
+  /// This function progressively reduces the vehicle's angular velocity so that it ends up upside down instead.
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void ApplyRolloverBehavior();
+
+  void CheckRollover(const float roll, const std::pair<float, float> threshold_roll);
+
+  void AddReferenceToManager();
+  void RemoveReferenceToManager();
+
+
+  FTimerHandle TimerHandler;
+public:
+  float SpeedAnim { 0.0f };
+  float RotationAnim { 0.0f };
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  float GetSpeedAnim() const { return SpeedAnim; }
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void SetSpeedAnim(float Speed) { SpeedAnim = Speed; }
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  float GetRotationAnim() const { return RotationAnim; }
+
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  void SetRotationAnim(float Rotation) { RotationAnim = Rotation; }
 };

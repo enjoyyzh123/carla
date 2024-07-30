@@ -27,6 +27,7 @@ namespace cg = carla::geom;
 using ActorId = carla::ActorId;
 using ActorPtr = carla::SharedPtr<cc::Actor>;
 using JunctionID = carla::road::JuncId;
+using Junction = carla::SharedPtr<carla::client::Junction>;
 using SimpleWaypointPtr = std::shared_ptr<SimpleWaypoint>;
 using Buffer = std::deque<SimpleWaypointPtr>;
 using BufferMap = std::unordered_map<carla::ActorId, Buffer>;
@@ -61,10 +62,9 @@ struct ActuationSignal {
 /// Structure to hold the controller state.
 struct StateEntry {
   cc::Timestamp time_instance;
-  float deviation;
-  float velocity;
-  float deviation_integral;
-  float velocity_integral;
+  float angular_deviation;
+  float velocity_deviation;
+  float steer;
 };
 
 } // namespace traffic_manager

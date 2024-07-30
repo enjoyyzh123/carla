@@ -10,6 +10,7 @@
 #include "TrafficLightGroup.h"
 #include "TrafficSignBase.h"
 #include "Carla/OpenDrive/OpenDrive.h"
+
 #include "TrafficLightManager.generated.h"
 
 /// Class In charge of creating and assigning traffic
@@ -92,6 +93,9 @@ private:
 
   UPROPERTY(EditAnywhere, Category= "Traffic Light Manager")
   TMap<FString, TSubclassOf<USignComponent>> SignComponentModels;
+
+  UPROPERTY(EditAnywhere, Category= "Traffic Light Manager")
+  TMap<FString, TSubclassOf<AActor>> SpeedLimitModels;
 
   UPROPERTY(Category = "Traffic Light Manager", VisibleDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
   USceneComponent *SceneComponent;

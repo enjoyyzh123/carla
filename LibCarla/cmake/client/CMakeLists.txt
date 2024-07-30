@@ -21,8 +21,6 @@ if (BUILD_RSS_VARIANT)
   install(FILES ${spdlog_file} DESTINATION lib)
   list(APPEND ADRSS_LIBS ${spdlog_file})
 
-  install(FILES ${ADRSS_INSTALL_DIR}/PROJ4/lib/libproj.a DESTINATION lib)
-
   foreach(ad_lib ad_physics ad_rss ad_map_access ad_map_opendrive_reader ad_rss_map_integration)
     set(${ad_lib}_file ${ADRSS_INSTALL_DIR}/${ad_lib}/lib/lib${ad_lib}.a)
     install(FILES ${${ad_lib}_file} DESTINATION lib)
@@ -226,6 +224,12 @@ file(GLOB libcarla_carla_streaming_low_level_sources
 set(libcarla_sources "${libcarla_sources};${libcarla_carla_streaming_low_level_sources}")
 install(FILES ${libcarla_carla_streaming_low_level_sources} DESTINATION include/carla/streaming/low_level)
 
+file(GLOB libcarla_carla_multigpu_sources
+    "${libcarla_source_path}/carla/multigpu/*.cpp"
+    "${libcarla_source_path}/carla/multigpu/*.h")
+set(libcarla_sources "${libcarla_sources};${libcarla_carla_multigpu_sources}")
+install(FILES ${libcarla_carla_multigpu_sources} DESTINATION include/carla/multigpu)
+
 file(GLOB libcarla_odr_spiral_sources
     "${libcarla_source_thirdparty_path}/odrSpiral/*.cpp"
     "${libcarla_source_thirdparty_path}/odrSpiral/*.h")
@@ -249,6 +253,12 @@ file(GLOB libcarla_carla_trafficmanager_sources
     "${libcarla_source_path}/carla/trafficmanager/*.h")
 set(libcarla_sources "${libcarla_sources};${libcarla_carla_trafficmanager_sources}")
 install(FILES ${libcarla_carla_trafficmanager_sources} DESTINATION include/carla/trafficmanager)
+
+file(GLOB libcarla_carla_ros2_sources
+    "${libcarla_source_path}/carla/ros2/*.cpp"
+    "${libcarla_source_path}/carla/ros2/*.h")
+set(libcarla_sources "${libcarla_sources};${libcarla_carla_ros2_sources}")
+install(FILES ${libcarla_carla_ros2_sources} DESTINATION include/carla/ros2)
 
 # ==============================================================================
 # Create targets for debug and release in the same build type.

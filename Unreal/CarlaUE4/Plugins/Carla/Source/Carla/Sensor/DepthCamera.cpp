@@ -7,6 +7,8 @@
 #include "Carla.h"
 #include "Carla/Sensor/DepthCamera.h"
 
+#include "Carla/Actor/ActorBlueprintFunctionLibrary.h"
+
 #include "Carla/Sensor/PixelReader.h"
 
 FActorDefinition ADepthCamera::GetSensorDefinition()
@@ -30,9 +32,6 @@ ADepthCamera::ADepthCamera(const FObjectInitializer &ObjectInitializer)
 
 void ADepthCamera::PostPhysTick(UWorld *World, ELevelTick TickType, float DeltaSeconds)
 {
-  if(ReadyToCapture)
-  {
-    FPixelReader::SendPixelsInRenderThread(*this);
-    ReadyToCapture = false;
-  }
+  TRACE_CPUPROFILER_EVENT_SCOPE(ADepthCamera::PostPhysTick);
+  FPixelReader::SendPixelsInRenderThread<ADepthCamera, FColor>(*this);
 }

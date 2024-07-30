@@ -235,49 +235,85 @@ namespace road {
   }
 
 
-    element::RoadInfoSignal* MapBuilder::AddSignal(
-        Road* road,
-        const SignId signal_id,
-        const double s,
-        const double t,
-        const std::string name,
-        const std::string dynamic,
-        const std::string orientation,
-        const double zOffset,
-        const std::string country,
-        const std::string type,
-        const std::string subtype,
-        const double value,
-        const std::string unit,
-        const double height,
-        const double width,
-        const std::string text,
-        const double hOffset,
-        const double pitch,
-        const double roll) {
-      _temp_signal_container[signal_id] = std::make_unique<Signal>(
-          road->GetId(),
-          signal_id,
-          s,
-          t,
-          name,
-          dynamic,
-          orientation,
-          zOffset,
-          country,
-          type,
-          subtype,
-          value,
-          unit,
-          height,
-          width,
-          text,
-          hOffset,
-          pitch,
-          roll);
+  element::RoadInfoSignal* MapBuilder::AddSignal(
+      Road* road,
+      const SignId signal_id,
+      const double s,
+      const double t,
+      const std::string name,
+      const std::string dynamic,
+      const std::string orientation,
+      const double zOffset,
+      const std::string country,
+      const std::string type,
+      const std::string subtype,
+      const double value,
+      const std::string unit,
+      const double height,
+      const double width,
+      const std::string text,
+      const double hOffset,
+      const double pitch,
+      const double roll) {
+    _temp_signal_container[signal_id] = std::make_unique<Signal>(
+        road->GetId(),
+        signal_id,
+        s,
+        t,
+        name,
+        dynamic,
+        orientation,
+        zOffset,
+        country,
+        type,
+        subtype,
+        value,
+        unit,
+        height,
+        width,
+        text,
+        hOffset,
+        pitch,
+        roll);
 
-      return AddSignalReference(road, signal_id, s, t, orientation);
-    }
+    return AddSignalReference(road, signal_id, s, t, orientation);
+  }
+
+  void MapBuilder::AddSignalPositionInertial(
+      const SignId signal_id,
+      const double x,
+      const double y,
+      const double z,
+      const double hdg,
+      const double pitch,
+      const double roll) {
+    std::unique_ptr<Signal> &signal = _temp_signal_container[signal_id];
+    signal->_using_inertial_position = true;
+    geom::Location location = geom::Location(x, -y, z);
+    signal->_transform = geom::Transform (location, geom::Rotation(
+        geom::Math::ToDegrees(static_cast<float>(pitch)),
+        geom::Math::ToDegrees(static_cast<float>(-hdg)),
+        geom::Math::ToDegrees(static_cast<float>(roll))));
+  }
+
+  void MapBuilder::AddSignalPositionRoad(
+      const SignId signal_id,
+      const RoadId road_id,
+      const double s,
+      const double t,
+      const double zOffset,
+      const double hOffset,
+      const double pitch,
+      const double roll) {
+    std::unique_ptr<Signal> &signal = _temp_signal_container[signal_id];
+    signal->_road_id = road_id;
+    signal->_s = s;
+    signal->_t = t;
+    signal->_zOffset = zOffset;
+    signal->_hOffset = hOffset;
+    signal->_pitch = pitch;
+    signal->_roll = roll;
+  }
 
     element::RoadInfoSignal* MapBuilder::AddSignalReference(
         Road* road,
@@ -769,8 +805,10 @@ namespace road {
 
     for(auto& signal_pair : _temp_signal_container) {
       auto& signal = signal_pair.second;
+      if (signal->_using_inertial_position) {
+        continue;
+      }
       auto transform = ComputeSignalTransform(signal, _map_data);
-      // Hack: compensate RoadRunner displacement (25cm) due to lightbox size
       if (SignalType::IsTrafficLight(signal->GetType())) {
         transform.location = transform.location +
             geom::Location(transform.GetForwardVector()*0.25);
@@ -787,11 +825,16 @@ namespace road {
     for(const auto& junction : _map_data._junctions) {
       for(const auto& controller : junction.second._controllers) {
         auto it = _map_data._controllers.find(controller);
-        DEBUG_ASSERT(it != _map_data._controllers.end());
-        it->second->_junctions.insert(junction.first);
-        for(const auto & signal : it->second->_signals) {
-          auto signal_it = _map_data._signals.find(signal);
-          signal_it->second->_controllers.insert(controller);
+        if(it != _map_data._controllers.end()){
+          if( it->second != nullptr ){
+            it->second->_junctions.insert(junction.first);
+            for(const auto & signal : it->second->_signals) {
+              auto signal_it = _map_data._signals.find(signal);
+              if( signal_it->second != nullptr ){
+                signal_it->second->_controllers.insert(controller);
+              }
+            }
+          }
         }
       }
     }
@@ -1002,33 +1045,53 @@ void MapBuilder::CreateController(
     for (auto& signal_pair : map._data._signals) {
       auto& signal = signal_pair.second;
       auto signal_position = signal->GetTransform().location;
+      auto signal_rotation = signal->GetTransform().rotation;
       auto closest_waypoint_to_signal =
-          map.GetClosestWaypointOnRoad(signal_position);
-      // workarround to not move speed signals
-      if (signal->GetName().substr(0, 6) == "Speed_" ||
-          signal->GetName().substr(0, 6) == "speed_" ||
-          signal->GetName().find("Stencil_STOP") != std::string::npos) {
+          map.GetClosestWaypointOnRoad(signal_position,
+          static_cast<int32_t>(carla::road::Lane::LaneType::Shoulder) |  static_cast<int32_t>(carla::road::Lane::LaneType::Driving));
+      // workarround to not move stencil stop
+      if (
+          signal->GetName().find("Stencil_STOP") != std::string::npos ||
+          signal->GetName().find("STATIC") != std::string::npos ||
+          signal->_using_inertial_position) {
         continue;
       }
       if(closest_waypoint_to_signal) {
-        auto distance_to_road =
-            (map.ComputeTransform(closest_waypoint_to_signal.get()).location -
-            signal_position).Length();
+        auto road_transform = map.ComputeTransform(closest_waypoint_to_signal.get());
+        auto distance_to_road = (road_transform.location -signal_position).Length();
         double lane_width = map.GetLaneWidth(closest_waypoint_to_signal.get());
+        int displacement_direction = 1;
         int iter = 0;
         int MaxIter = 10;
         // Displaces signal until it finds a suitable spot
-        while(distance_to_road < lane_width * 0.5 && iter < MaxIter) {
+        while(distance_to_road < (lane_width * 0.7) && iter < MaxIter && displacement_direction != 0) {
           if(iter == 0) {
-            log_warning("Traffic sign",
+            log_debug("Traffic sign",
                 signal->GetSignalId(),
                 "overlaps a driving lane. Moving out of the road...");
           }
-          geom::Vector3D displacement = 1.f*(signal->GetTransform().GetRightVector()) *
-              static_cast<float>(abs(lane_width))*0.5f;
-          signal_position += displacement;
+
+          auto right_waypoint = map.GetRight(closest_waypoint_to_signal.get());
+          auto right_lane_type = (right_waypoint) ? map.GetLaneType(right_waypoint.get()) : carla::road::Lane::LaneType::None;
+
+          auto left_waypoint = map.GetLeft(closest_waypoint_to_signal.get());
+          auto left_lane_type = (left_waypoint) ? map.GetLaneType(left_waypoint.get()) : carla::road::Lane::LaneType::None;
+
+          if (right_lane_type != carla::road::Lane::LaneType::Driving) {
+            displacement_direction = 1;
+          } else if (left_lane_type != carla::road::Lane::LaneType::Driving) {
+            displacement_direction = -1;
+          } else {
+            displacement_direction = 0;
+          }
+
+          geom::Vector3D displacement = 1.f*(road_transform.GetRightVector()) *
+              static_cast<float>(abs(lane_width))*0.2f;
+          signal_position += (displacement * displacement_direction);
+          signal_rotation = road_transform.rotation;
           closest_waypoint_to_signal =
-              map.GetClosestWaypointOnRoad(signal_position);
+              map.GetClosestWaypointOnRoad(signal_position,
+              static_cast<int32_t>(carla::road::Lane::LaneType::Shoulder) |  static_cast<int32_t>(carla::road::Lane::LaneType::Driving));
           distance_to_road =
               (map.ComputeTransform(closest_waypoint_to_signal.get()).location -
               signal_position).Length();
@@ -1036,10 +1099,11 @@ void MapBuilder::CreateController(
           iter++;
         }
         if(iter == MaxIter) {
-          log_warning("Failed to find suitable place for signal.");
+          log_debug("Failed to find suitable place for signal.");
         } else {
           // Only perform the displacement if a good location has been found
           signal->_transform.location = signal_position;
+          signal->_transform.rotation = signal_rotation;
         }
       }
     }

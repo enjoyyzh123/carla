@@ -125,6 +125,7 @@ void export_world() {
   namespace cc = carla::client;
   namespace cg = carla::geom;
   namespace cr = carla::rpc;
+  namespace csd = carla::sensor::data;
 
   class_<cc::Timestamp>("Timestamp")
     .def(init<size_t, double, double, double>(
@@ -152,7 +153,7 @@ void export_world() {
   ;
 
   class_<cr::EpisodeSettings>("WorldSettings")
-    .def(init<bool, bool, double, bool, double, int, float, bool>(
+    .def(init<bool, bool, double, bool, double, int, float, bool, float, float, bool>(
         (arg("synchronous_mode")=false,
          arg("no_rendering_mode")=false,
          arg("fixed_delta_seconds")=0.0,
@@ -160,7 +161,10 @@ void export_world() {
          arg("max_substep_delta_time")=0.01,
          arg("max_substeps")=10,
          arg("max_culling_distance")=0.0f,
-         arg("deterministic_ragdolls")=false)))
+         arg("deterministic_ragdolls")=false,
+         arg("tile_stream_distance")=3000.f,
+         arg("actor_active_distance")=2000.f,
+         arg("spectator_as_ego")=true)))
     .def_readwrite("synchronous_mode", &cr::EpisodeSettings::synchronous_mode)
     .def_readwrite("no_rendering_mode", &cr::EpisodeSettings::no_rendering_mode)
     .def_readwrite("substepping", &cr::EpisodeSettings::substepping)
@@ -176,6 +180,9 @@ void export_world() {
           double fds = (value == object{} ? 0.0 : extract<double>(value));
           self.fixed_delta_seconds = fds > 0.0 ? fds : boost::optional<double>{};
         })
+    .def_readwrite("tile_stream_distance", &cr::EpisodeSettings::tile_stream_distance)
+    .def_readwrite("actor_active_distance", &cr::EpisodeSettings::actor_active_distance)
+    .def_readwrite("spectator_as_ego", &cr::EpisodeSettings::spectator_as_ego)
     .def("__eq__", &cr::EpisodeSettings::operator==)
     .def("__ne__", &cr::EpisodeSettings::operator!=)
     .def(self_ns::str(self_ns::self))
@@ -193,6 +200,7 @@ void export_world() {
   enum_<cr::AttachmentType>("AttachmentType")
     .value("Rigid", cr::AttachmentType::Rigid)
     .value("SpringArm", cr::AttachmentType::SpringArm)
+    .value("SpringArmGhost", cr::AttachmentType::SpringArmGhost)
   ;
 
   enum_<cr::CityObjectLabel>("CityObjectLabel")
@@ -207,7 +215,7 @@ void export_world() {
     .value("Sidewalks", cr::CityObjectLabel::Sidewalks)
     .value("TrafficSigns", cr::CityObjectLabel::TrafficSigns)
     .value("Vegetation", cr::CityObjectLabel::Vegetation)
-    .value("Vehicles", cr::CityObjectLabel::Vehicles)
+    .value("Car", cr::CityObjectLabel::Car)
     .value("Walls", cr::CityObjectLabel::Walls)
     .value("Sky", cr::CityObjectLabel::Sky)
     .value("Ground", cr::CityObjectLabel::Ground)
@@ -219,6 +227,12 @@ void export_world() {
     .value("Dynamic", cr::CityObjectLabel::Dynamic)
     .value("Water", cr::CityObjectLabel::Water)
     .value("Terrain", cr::CityObjectLabel::Terrain)
+    .value("Truck", cr::CityObjectLabel::Truck)
+    .value("Motorcycle", cr::CityObjectLabel::Motorcycle)
+    .value("Bicycle", cr::CityObjectLabel::Bicycle)
+    .value("Bus", cr::CityObjectLabel::Bus)
+    .value("Rider", cr::CityObjectLabel::Rider)
+    .value("Train", cr::CityObjectLabel::Train)
     .value("Any", cr::CityObjectLabel::Any)
   ;
 
@@ -239,6 +253,39 @@ void export_world() {
     .value("StreetLights", cr::MapLayer::StreetLights)
     .value("Walls", cr::MapLayer::Walls)
     .value("All", cr::MapLayer::All)
+  ;
+
+  enum_<cr::MaterialParameter>("MaterialParameter")
+    .value("Normal", cr::MaterialParameter::Tex_Normal)
+    .value("AO_Roughness_Metallic_Emissive", cr::MaterialParameter::Tex_Ao_Roughness_Metallic_Emissive)
+    .value("Diffuse", cr::MaterialParameter::Tex_Diffuse)
+    .value("Emissive", cr::MaterialParameter::Tex_Emissive)
+  ;
+
+  class_<cr::TextureColor>("TextureColor")
+    .def(init<uint32_t, uint32_t>())
+    .add_property("width", &cr::TextureColor::GetWidth)
+    .add_property("height", &cr::TextureColor::GetHeight)
+    .def("set_dimensions", &cr::TextureColor::SetDimensions)
+    .def("get", +[](const cr::TextureColor &self, int x, int y) -> csd::Color{
+      return self.At(static_cast<uint32_t>(x), static_cast<uint32_t>(y));
+    })
+    .def("set", +[](cr::TextureColor &self, int x, int y, csd::Color& value) {
+      self.At(static_cast<uint32_t>(x), static_cast<uint32_t>(y)) = value;
+    })
+  ;
+
+  class_<cr::TextureFloatColor>("TextureFloatColor")
+    .def(init<uint32_t, uint32_t>())
+    .add_property("width", &cr::TextureFloatColor::GetWidth)
+    .add_property("height", &cr::TextureFloatColor::GetHeight)
+    .def("set_dimensions", &cr::TextureFloatColor::SetDimensions)
+    .def("get", +[](const cr::TextureFloatColor &self, int x, int y) -> cr::FloatColor{
+      return self.At(static_cast<uint32_t>(x), static_cast<uint32_t>(y));
+    })
+    .def("set", +[](cr::TextureFloatColor &self, int x, int y, cr::FloatColor& value) {
+      self.At(static_cast<uint32_t>(x), static_cast<uint32_t>(y)) = value;
+    })
   ;
 
 #define SPAWN_ACTOR_WITHOUT_GIL(fn) +[]( \
@@ -267,7 +314,7 @@ void export_world() {
     .def("get_random_location_from_navigation", CALL_RETURNING_OPTIONAL_WITHOUT_GIL(cc::World, GetRandomLocationFromNavigation))
     .def("get_spectator", CONST_CALL_WITHOUT_GIL(cc::World, GetSpectator))
     .def("get_settings", CONST_CALL_WITHOUT_GIL(cc::World, GetSettings))
-    .def("apply_settings", &ApplySettings, (arg("settings"), arg("seconds")=10.0))
+    .def("apply_settings", &ApplySettings, (arg("settings"), arg("seconds")=0.0))
     .def("get_weather", CONST_CALL_WITHOUT_GIL(cc::World, GetWeather))
     .def("set_weather", &cc::World::SetWeather)
     .def("get_snapshot", &cc::World::GetSnapshot)
@@ -276,13 +323,17 @@ void export_world() {
     .def("get_actors", &GetActorsById, (arg("actor_ids")))
     .def("spawn_actor", SPAWN_ACTOR_WITHOUT_GIL(SpawnActor))
     .def("try_spawn_actor", SPAWN_ACTOR_WITHOUT_GIL(TrySpawnActor))
-    .def("wait_for_tick", &WaitForTick, (arg("seconds")=10.0))
+    .def("wait_for_tick", &WaitForTick, (arg("seconds")=0.0))
     .def("on_tick", &OnTick, (arg("callback")))
     .def("remove_on_tick", &cc::World::RemoveOnTick, (arg("callback_id")))
-    .def("tick", &Tick, (arg("seconds")=10.0))
+    .def("tick", &Tick, (arg("seconds")=0.0))
     .def("set_pedestrians_cross_factor", CALL_WITHOUT_GIL_1(cc::World, SetPedestriansCrossFactor, float), (arg("percentage")))
+    .def("set_pedestrians_seed", CALL_WITHOUT_GIL_1(cc::World, SetPedestriansSeed, unsigned int), (arg("seed")))
     .def("get_traffic_sign", CONST_CALL_WITHOUT_GIL_1(cc::World, GetTrafficSign, cc::Landmark), arg("landmark"))
     .def("get_traffic_light", CONST_CALL_WITHOUT_GIL_1(cc::World, GetTrafficLight, cc::Landmark), arg("landmark"))
+    .def("get_traffic_light_from_opendrive_id", CONST_CALL_WITHOUT_GIL_1(cc::World, GetTrafficLightFromOpenDRIVE, const carla::road::SignId&), arg("traffic_light_id"))
+    .def("get_traffic_lights_from_waypoint", CALL_RETURNING_LIST_2(cc::World, GetTrafficLightsFromWaypoint, const cc::Waypoint&, double), (arg("waypoint"), arg("distance")))
+    .def("get_traffic_lights_in_junction", CALL_RETURNING_LIST_1(cc::World, GetTrafficLightsInJunction, carla::road::JuncId), (arg("junction_id")))
     .def("reset_all_traffic_lights", &cc::World::ResetAllTrafficLights)
     .def("get_lightmanager", CONST_CALL_WITHOUT_GIL(cc::World, GetLightManager))
     .def("freeze_all_traffic_lights", &cc::World::FreezeAllTrafficLights, (arg("frozen")))
@@ -292,7 +343,19 @@ void export_world() {
     .def("cast_ray", CALL_RETURNING_LIST_2(cc::World, CastRay, cg::Location, cg::Location), (arg("initial_location"), arg("final_location")))
     .def("project_point", CALL_RETURNING_OPTIONAL_3(cc::World, ProjectPoint, cg::Location, cg::Vector3D, float), (arg("location"), arg("direction"), arg("search_distance")=10000.f))
     .def("ground_projection", CALL_RETURNING_OPTIONAL_2(cc::World, GroundProjection, cg::Location, float), (arg("location"), arg("search_distance")=10000.f))
-
+    .def("get_names_of_all_objects", CALL_RETURNING_LIST(cc::World, GetNamesOfAllObjects))
+    .def("apply_color_texture_to_object", &cc::World::ApplyColorTextureToObject, (arg("object_name"), arg("material_parameter"), arg("texture")))
+    .def("apply_float_color_texture_to_object", &cc::World::ApplyFloatColorTextureToObject, (arg("object_name"), arg("material_parameter"), arg("texture")))
+    .def("apply_textures_to_object", &cc::World::ApplyTexturesToObject, (arg("object_name"), arg("diffuse_texture"), arg("emissive_texture"), arg("normal_texture"), arg("ao_roughness_metallic_emissive_texture")))
+    .def("apply_color_texture_to_objects", +[](cc::World &self, boost::python::list &list, const cr::MaterialParameter& parameter, const cr::TextureColor& Texture) {
+        self.ApplyColorTextureToObjects(PythonLitstToVector<std::string>(list), parameter, Texture);
+      }, (arg("objects_name_list"), arg("material_parameter"), arg("texture")))
+    .def("apply_float_color_texture_to_objects", +[](cc::World &self, boost::python::list &list, const cr::MaterialParameter& parameter, const cr::TextureFloatColor& Texture) {
+        self.ApplyFloatColorTextureToObjects(PythonLitstToVector<std::string>(list), parameter, Texture);
+      }, (arg("objects_name_list"), arg("material_parameter"), arg("texture")))
+    .def("apply_textures_to_objects", +[](cc::World &self, boost::python::list &list, const cr::TextureColor& diffuse_texture, const cr::TextureFloatColor& emissive_texture, const cr::TextureFloatColor& normal_texture, const cr::TextureFloatColor& ao_roughness_metallic_emissive_texture) {
+        self.ApplyTexturesToObjects(PythonLitstToVector<std::string>(list), diffuse_texture, emissive_texture, normal_texture, ao_roughness_metallic_emissive_texture);
+      }, (arg("objects_name_list"), arg("diffuse_texture"), arg("emissive_texture"), arg("normal_texture"), arg("ao_roughness_metallic_emissive_texture")))
     .def(self_ns::str(self_ns::self))
   ;
 

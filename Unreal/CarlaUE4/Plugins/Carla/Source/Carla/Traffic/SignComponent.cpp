@@ -7,6 +7,12 @@
 
 #include "SignComponent.h"
 
+#include <compiler/disable-ue4-macros.h>
+#include "carla/opendrive/OpenDriveParser.h"
+#include "carla/road/element/RoadInfoSignal.h"
+#include "carla/rpc/String.h"
+#include <compiler/enable-ue4-macros.h>
+
 USignComponent::USignComponent()
 {
   PrimaryComponentTick.bCanEverTick = false;
@@ -70,6 +76,16 @@ TArray<std::pair<cr::RoadId, const cre::RoadInfoSignal*>>
   return Result;
 }
 
+const cr::Signal* USignComponent::GetSignal(const cr::Map &Map) const
+{
+  std::string std_signal_id = carla::rpc::FromFString(GetSignId());
+  if (Map.GetSignals().count(std_signal_id))
+  {
+    return Map.GetSignals().at(std_signal_id).get();
+  }
+  return nullptr;
+}
+
 UBoxComponent* USignComponent::GenerateTriggerBox(const FTransform &BoxTransform,
     float BoxSize)
 {
@@ -81,6 +97,20 @@ UBoxComponent* USignComponent::GenerateTriggerBox(const FTransform &BoxTransform
       FAttachmentTransformRules::KeepRelativeTransform);
   BoxComponent->SetWorldTransform(BoxTransform);
   BoxComponent->SetBoxExtent(FVector(BoxSize, BoxSize, BoxSize), true);
+  return BoxComponent;
+}
+
+UBoxComponent* USignComponent::GenerateTriggerBox(const FTransform &BoxTransform,
+    const FVector &BoxSize)
+{
+  AActor *ParentActor = GetOwner();
+  UBoxComponent *BoxComponent = NewObject<UBoxComponent>(ParentActor);
+  BoxComponent->RegisterComponent();
+  BoxComponent->AttachToComponent(
+      ParentActor->GetRootComponent(),
+      FAttachmentTransformRules::KeepRelativeTransform);
+  BoxComponent->SetWorldTransform(BoxTransform);
+  BoxComponent->SetBoxExtent(BoxSize, true);
   return BoxComponent;
 }
 

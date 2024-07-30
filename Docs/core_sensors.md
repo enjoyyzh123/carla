@@ -1,4 +1,4 @@
-# 4th. Sensors and data
+# Sensors and data
 
 Sensors are actors that retrieve data from their surroundings. They are crucial to create learning environment for driving agents.  
 
@@ -12,7 +12,8 @@ This page summarizes everything necessary to start handling sensors. It introduc
 * [__Types of sensors__](#types-of-sensors)  
 	*   [Cameras](#cameras)  
 	*   [Detectors](#detectors)  
-	*   [Other](#other)  
+	*   [Other](#other) 
+* [__Sensors reference__](ref_sensors.md)
 
 ---
 ## Sensors step-by-step  
@@ -48,6 +49,7 @@ blueprint.set_attribute('sensor_tick', '1.0')
 
 * __Rigid attachment.__ Movement is strict regarding its parent location. This is the proper attachment to retrieve data from the simulation.  
 * __SpringArm attachment.__ Movement is eased with little accelerations and decelerations. This attachment is only recommended to record videos from the simulation. The movement is smooth and "hops" are avoided when updating the cameras' positions.  
+* __SpringArmGhost attachment.__ Like the previous one but without doing the collision test, so the camera or sensor could cross walls or other geometries.  
 
 ```py
 transform = carla.Transform(carla.Location(x=0.8, z=1.7))
@@ -102,16 +104,19 @@ Sensor data differs a lot between sensor types. Take a look at the [sensors refe
  
 ### Cameras
 
-Take a shot of the world from their point of view. The helper class [carla.ColorConverter](python_api.md#carla.ColorConverter) will modify said image to represent different information.
+Take a shot of the world from their point of view. For cameras that return [carla.Image](<../python_api#carlaimage>), you can use the helper class [carla.ColorConverter](python_api.md#carla.ColorConverter) to modify the image to represent different information.
 
 * __Retrieve data__ every simulation step.  
 
 
-| Sensor                                                                                                                                                                                          | Output                                                                                                                                                                                          | Overview                                                                                                                                                                                        |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Depth                                                                                | [carla.Image](<../python_api#carlaimage>)                                            | Renders the depth of the elements in the field of view in a gray-scale map.          |
-| RGB                                                                                  | [carla.Image](<../python_api#carlaimage>)                                            | Provides clear vision of the surroundings. Looks like a normal photo of the scene.   |
-| Semantic segmentation                                                                | [carla.Image](<../python_api#carlaimage>)                                            | Renders elements in the field of view with a specific color according to their tags. |
+|Sensor |Output | Overview       |
+| ----------------- | ---------- | ------------------ |
+| [Depth](ref_sensors.md#depth-camera) | [carla.Image](<../python_api#carlaimage>)  |Renders the depth of the elements in the field of view in a gray-scale map.          |
+| [RGB](ref_sensors.md#rgb-camera)      | [carla.Image](<../python_api#carlaimage>)   | Provides clear vision of the surroundings. Looks like a normal photo of the scene.   |
+| [Optical Flow](ref_sensors.md#optical-flow-camera)    | [carla.Image](<../python_api#carlaimage>)  | Renders the motion of every pixel from the camera.  |
+| [Semantic segmentation](ref_sensors.md#semantic-segmentation-camera)    | [carla.Image](<../python_api#carlaimage>)  | Renders elements in the field of view with a specific color according to their tags. |
+| [Instance segmentation](ref_sensors.md#instance-segmentation-camera)    | [carla.Image](<../python_api#carlaimage>)  | Renders elements in the field of view with a specific color according to their tags and a unique object ID. |
+| [DVS](ref_sensors.md#dvs-camera)    | [carla.DVSEventArray](<../python_api#carladvseventarray>)  | Measures changes of brightness intensity asynchronously as an event stream.  |
 
 <br>
 
@@ -126,9 +131,9 @@ Retrieve data when the object they are attached to registers a specific event.
 
 | Sensor                                                                                                                                                                                          | Output                                                                                                                                                                                          | Overview                                                                                                                                                                                        |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Collision                                                                   | [carla.CollisionEvent](<../python_api#carlacollisionevent>)                 | Retrieves collisions between its parent and other actors.                   |
-| Lane invasion                                                               | [carla.LaneInvasionEvent](<../python_api#carlalaneinvasionevent>)           | Registers when its parent crosses a lane marking.                           |
-| Obstacle                                                                    | [carla.ObstacleDetectionEvent](<../python_api#carlaobstacledetectionevent>) | Detects possible obstacles ahead of its parent.                             |
+| [Collision](ref_sensors.md#collision-detector)                                                                   | [carla.CollisionEvent](<../python_api#carlacollisionevent>)                 | Retrieves collisions between its parent and other actors.                   |
+| [Lane invasion](ref_sensors.md#lane-invasion-detector)                                                               | [carla.LaneInvasionEvent](<../python_api#carlalaneinvasionevent>)           | Registers when its parent crosses a lane marking.                           |
+| [Obstacle](ref_sensors.md#obstacle-detector)                                                                    | [carla.ObstacleDetectionEvent](<../python_api#carlaobstacledetectionevent>) | Detects possible obstacles ahead of its parent.                             |
 
 <br>
 
@@ -142,12 +147,12 @@ Different functionalities such as navigation, measurement of physical properties
 
 | Sensor                                                                                                                                                                                          | Output                                                                                                                                                                                          | Overview                                                                                                                                                                                        |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GNSS                                                                                                                                                                                            | [carla.GNSSMeasurement](<../python_api#carlagnssmeasurement>)                                                                                                                                   | Retrieves the geolocation of the sensor.                                                                                                                                                        |
-| IMU                                                                                                                                                                                             | [carla.IMUMeasurement](<../python_api#carlaimumeasurement>)                                                                                                                                     | Comprises an accelerometer, a gyroscope, and a compass.                                                                                                                                         |
-| LIDAR                                                                                                                                                                                           | [carla.LidarMeasurement](<../python_api#carlalidarmeasurement>)                                                                                                                                 | A rotating LIDAR. Generates a 4D point cloud with coordinates and intensity per point to model the surroundings.                                                                                |
-| Radar                                                                                                                                                                                           | [carla.RadarMeasurement](<../python_api#carlaradarmeasurement>)                                                                                                                                 | 2D point map modelling elements in sight and their movement regarding the sensor.                                                                                                               |
-| RSS                                                                                                                                                                                             | [carla.RssResponse](<../python_api#carlarssresponse>)                                                                                                                                           | Modifies the controller applied to a vehicle according to safety checks. This sensor works in a different manner than the rest, and there is specific [RSS documentation](<../adv_rss>) for it. |
-| Semantic LIDAR                                                                                                                                                                                  | [carla.SemanticLidarMeasurement](<../python_api#carlasemanticlidarmeasurement>)                                                                                                                 | A rotating LIDAR. Generates a 3D point cloud with extra information regarding instance and semantic segmentation.                                                                               |
+| [GNSS](ref_sensors.md#gnss-sensor)                                                                                                                                                                                            | [carla.GNSSMeasurement](<../python_api#carlagnssmeasurement>)                                                                                                                                   | Retrieves the geolocation of the sensor.                                                                                                                                                        |
+| [IMU](ref_sensors.md#imu-sensor)                                                                                                                                                                                             | [carla.IMUMeasurement](<../python_api#carlaimumeasurement>)                                                                                                                                     | Comprises an accelerometer, a gyroscope, and a compass.                                                                                                                                         |
+| [LIDAR](ref_sensors.md#lidar-sensor)                                                                                                                                                                                           | [carla.LidarMeasurement](<../python_api#carlalidarmeasurement>)                                                                                                                                 | A rotating LIDAR. Generates a 4D point cloud with coordinates and intensity per point to model the surroundings.                                                                                |
+| [Radar](ref_sensors.md#radar-sensor)                                                                                                                                                                                           | [carla.RadarMeasurement](<../python_api#carlaradarmeasurement>)                                                                                                                                 | 2D point map modelling elements in sight and their movement regarding the sensor.                                                                                                               |
+| [RSS](ref_sensors.md#rss-sensor)                                                                                                                                                                                             | [carla.RssResponse](<../python_api#carlarssresponse>)                                                                                                                                           | Modifies the controller applied to a vehicle according to safety checks. This sensor works in a different manner than the rest, and there is specific [RSS documentation](<../adv_rss>) for it. |
+| [Semantic LIDAR](ref_sensors.md#semantic-lidar-sensor)                                                                                                                                                                                  | [carla.SemanticLidarMeasurement](<../python_api#carlasemanticlidarmeasurement>)                                                                                                                 | A rotating LIDAR. Generates a 3D point cloud with extra information regarding instance and semantic segmentation.                                                                               |
 
 <br>
 
@@ -184,7 +189,7 @@ Python API reference</a>
 
 <div class="build-buttons">
 <p>
-<a href="https://forum.carla.org/" target="_blank" class="btn btn-neutral" title="Go to the CARLA forum">
+<a href="https://github.com/carla-simulator/carla/discussions/" target="_blank" class="btn btn-neutral" title="Go to the CARLA forum">
 CARLA forum</a>
 </p>
 </div>

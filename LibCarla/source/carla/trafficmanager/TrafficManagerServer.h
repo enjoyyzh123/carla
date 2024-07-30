@@ -19,6 +19,8 @@ namespace carla {
 namespace traffic_manager {
 
 using ActorPtr = carla::SharedPtr<carla::client::Actor>;
+using Path = std::vector<cg::Location>;
+using Route = std::vector<uint8_t>;
 
 using namespace constants::Networking;
 
@@ -92,11 +94,34 @@ public:
         tm->SetPercentageSpeedDifference(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), percentage);
       });
 
+      /// Method to set a lane offset displacement from the center line.
+      /// Positive values imply a right offset while negative ones mean a left one.
+      server->bind("set_lane_offset", [=](carla::rpc::Actor actor, const float offset) {
+        tm->SetLaneOffset(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), offset);
+      });
+
+      /// Set a vehicle's exact desired velocity.
+      server->bind("set_desired_speed", [=](carla::rpc::Actor actor, const float value) {
+        tm->SetDesiredSpeed(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), value);
+      });
+
+      /// Method to set the automatic management of the vehicle lights
+      server->bind("update_vehicle_lights", [=](carla::rpc::Actor actor, const bool do_update) {
+        tm->SetUpdateVehicleLights(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), do_update);
+      });
+
       /// Method to set a global % decrease in velocity with respect to the speed limit.
       /// If less than 0, it's a % increase.
       server->bind("set_global_percentage_speed_difference", [=](const float percentage) {
         tm->SetGlobalPercentageSpeedDifference(percentage);
       });
+
+      /// Method to set a global lane offset displacement from the center line.
+      /// Positive values imply a right offset while negative ones mean a left one.
+      server->bind("set_global_lane_offset", [=](const float offset) {
+        tm->SetGlobalLaneOffset(offset);
+      });
+
 
       /// Method to set collision detection rules between vehicles.
       server->bind("set_collision_detection", [=](const carla::rpc::Actor &reference_actor, const carla::rpc::Actor &other_actor, const bool detect_collision) {
@@ -138,19 +163,29 @@ public:
         tm->SetPercentageRunningSign(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), percentage);
       });
 
-        /// Method to specify the % chance of ignoring collisions with any walker.
+      /// Method to specify the % chance of ignoring collisions with any walker.
       server->bind("set_percentage_ignore_walkers", [=](carla::rpc::Actor actor, const float percentage) {
         tm->SetPercentageIgnoreWalkers(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), percentage);
       });
 
-        /// Method to specify the % chance of ignoring collisions with any vehicle.
+      /// Method to specify the % chance of ignoring collisions with any vehicle.
       server->bind("set_percentage_ignore_vehicles", [=](carla::rpc::Actor actor, const float percentage) {
         tm->SetPercentageIgnoreVehicles(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), percentage);
       });
 
-      /// Method to specify the % chance of ignoring collisions with any vehicle.
+      /// Method to set % to keep on the right lane.
       server->bind("set_percentage_keep_right_rule", [=](carla::rpc::Actor actor, const float percentage) {
         tm->SetKeepRightPercentage(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), percentage);
+      });
+
+      /// Method to set % to randomly do a left lane change.
+      server->bind("set_percentage_random_left_lanechange", [=](carla::rpc::Actor actor, const float percentage) {
+        tm->SetRandomLeftLaneChangePercentage(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), percentage);
+      });
+
+      /// Method to set % to randomly do a right lane change.
+      server->bind("set_percentage_random_right_lanechange", [=](carla::rpc::Actor actor, const float percentage) {
+        tm->SetRandomRightLaneChangePercentage(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), percentage);
       });
 
       /// Method to set hybrid physics mode.
@@ -165,7 +200,61 @@ public:
 
       /// Method to set hybrid physics radius.
       server->bind("set_osm_mode", [=](const bool mode_switch) {
-        tm->SetHybridPhysicsRadius(mode_switch);
+        tm->SetOSMMode(mode_switch);
+      });
+
+      /// Method to set our own imported path.
+      server->bind("set_path", [=](carla::rpc::Actor actor, const Path path, const bool empty_buffer) {
+        tm->SetCustomPath(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), path, empty_buffer);
+      });
+
+      /// Method to remove a list of points.
+      server->bind("remove_custom_path", [=](const ActorId actor_id, const bool remove_path) {
+        tm->RemoveUploadPath(actor_id, remove_path);
+      });
+
+       /// Method to update an already set list of points.
+      server->bind("update_custom_path", [=](const ActorId actor_id, const Path path) {
+        tm->UpdateUploadPath(actor_id, path);
+      });
+
+      /// Method to set our own imported route.
+      server->bind("set_imported_route", [=](carla::rpc::Actor actor, const Route route, const bool empty_buffer) {
+        tm->SetImportedRoute(carla::client::detail::ActorVariant(actor).Get(tm->GetEpisodeProxy()), route, empty_buffer);
+      });
+
+      /// Method to remove a route.
+      server->bind("remove_imported_route", [=](const ActorId actor_id, const bool remove_path) {
+        tm->RemoveImportedRoute(actor_id, remove_path);
+      });
+
+      /// Method to update an already set list of points.
+      server->bind("update_imported_route", [=](const ActorId actor_id, const Route route) {
+        tm->UpdateImportedRoute(actor_id, route);
+      });
+
+      /// Method to set respawn dormant vehicles mode.
+      server->bind("set_respawn_dormant_vehicles", [=](const bool mode_switch) {
+        tm->SetRespawnDormantVehicles(mode_switch);
+      });
+
+      /// Method to set respawn dormant vehicles mode.
+      server->bind("set_boundaries_respawn_dormant_vehicles", [=](const float lower_bound, const float upper_bound) {
+        tm->SetBoundariesRespawnDormantVehicles(lower_bound, upper_bound);
+      });
+
+      /// Method to get the vehicle's next action.
+      server->bind("get_next_action", [=](const ActorId actor_id) {
+        tm->GetNextAction(actor_id);
+      });
+
+      /// Method to get the vehicle's action buffer.
+      server->bind("get_all_actions", [=](const ActorId actor_id) {
+        tm->GetActionBuffer(actor_id);
+      });
+
+      server->bind("shut_down", [=]() {
+        tm->Release();
       });
 
       /// Method to set synchronous mode.

@@ -55,6 +55,10 @@ namespace geom {
       return a * a;
     }
 
+    static auto Cross(const Vector3D &a, const Vector3D &b) {
+      return Vector3D(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+    }
+
     static auto Dot(const Vector3D &a, const Vector3D &b) {
       return a.x * b.x + a.y * b.y + a.z * b.z;
     }
@@ -77,6 +81,10 @@ namespace geom {
 
     static auto Distance2D(const Vector3D &a, const Vector3D &b) {
       return std::sqrt(DistanceSquared2D(a, b));
+    }
+
+    static float LinearLerp(float a, float b, float f) {
+      return a * (1.0f - f) + (b * f);
     }
 
     /// Returns the angle between 2 vectors in radians

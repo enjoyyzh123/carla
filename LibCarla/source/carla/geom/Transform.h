@@ -12,7 +12,9 @@
 #include "carla/geom/Rotation.h"
 
 #ifdef LIBCARLA_INCLUDED_FROM_UE4
+#include <compiler/enable-ue4-macros.h>
 #include "Math/Transform.h"
+#include <compiler/disable-ue4-macros.h>
 #endif // LIBCARLA_INCLUDED_FROM_UE4
 
 namespace carla {
@@ -67,6 +69,13 @@ namespace geom {
       rotation.RotateVector(out_point); // First rotate
       out_point += location;            // Then translate
       in_point = out_point;
+    }
+
+    /// Applies this transformation to @a in_vector (rotation only).
+    void TransformVector(Vector3D &in_vector) const {
+      auto out_vector = in_vector;
+      rotation.RotateVector(out_vector); // First rotate
+      in_vector = out_vector;
     }
 
     /// Applies the inverse of this transformation to @a in_point

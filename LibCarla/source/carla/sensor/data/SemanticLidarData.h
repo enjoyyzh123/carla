@@ -13,6 +13,11 @@
 #include <numeric>
 
 namespace carla {
+
+namespace ros2 {
+  class ROS2;
+}
+
 namespace sensor {
 
 namespace s11n {
@@ -110,18 +115,20 @@ namespace data {
       return _header[Index::ChannelCount];
     }
 
-    virtual void ResetSerPoints(std::vector<uint32_t> points_per_channel) {
+    virtual void ResetMemory(std::vector<uint32_t> points_per_channel) {
       DEBUG_ASSERT(GetChannelCount() > points_per_channel.size());
       std::memset(_header.data() + Index::SIZE, 0, sizeof(uint32_t) * GetChannelCount());
-
-      for (auto idxChannel = 0u; idxChannel < GetChannelCount(); ++idxChannel)
-        _header[Index::SIZE + idxChannel] = points_per_channel[idxChannel];
 
       uint32_t total_points = static_cast<uint32_t>(
           std::accumulate(points_per_channel.begin(), points_per_channel.end(), 0));
 
       _ser_points.clear();
       _ser_points.reserve(total_points);
+    }
+
+    virtual void WriteChannelCount(std::vector<uint32_t> points_per_channel) {
+      for (auto idxChannel = 0u; idxChannel < GetChannelCount(); ++idxChannel)
+        _header[Index::SIZE + idxChannel] = points_per_channel[idxChannel];
     }
 
     virtual void WritePointSync(SemanticLidarDetection &detection) {
@@ -137,6 +144,8 @@ namespace data {
 
   friend class s11n::SemanticLidarHeaderView;
   friend class s11n::SemanticLidarSerializer;
+  friend class carla::ros2::ROS2;
+
   };
 
 } // namespace s11n

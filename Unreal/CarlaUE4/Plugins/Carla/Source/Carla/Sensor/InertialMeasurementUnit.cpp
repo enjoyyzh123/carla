@@ -13,6 +13,7 @@
 
 #include <compiler/disable-ue4-macros.h>
 #include "carla/geom/Math.h"
+#include "carla/ros2/ROS2.h"
 #include <compiler/enable-ue4-macros.h>
 
 #include <limits>
@@ -167,25 +168,52 @@ float AInertialMeasurementUnit::ComputeCompass()
 {
   // Magnetometer: orientation with respect to the North in rad
   const FVector ForwVect = GetActorForwardVector().GetSafeNormal2D();
-  float Compass = std::acos(FVector::DotProduct(CarlaNorthVector, ForwVect));
+  const float DotProd = FVector::DotProduct(CarlaNorthVector, ForwVect);
 
+  // We check if the dot product is higher than 1.0 due to numerical error
+  if (DotProd >= 1.00f)
+    return 0.0f;
+
+  const float Compass = std::acos(DotProd);
   // Keep the angle between [0, 2pi)
   if (FVector::CrossProduct(CarlaNorthVector, ForwVect).Z < 0.0f)
-  {
-    Compass = carla::geom::Math::Pi2<float>() - Compass;
-  }
+    return carla::geom::Math::Pi2<float>() - Compass;
 
   return Compass;
 }
 
 void AInertialMeasurementUnit::PostPhysTick(UWorld *World, ELevelTick TickType, float DeltaTime)
 {
+  carla::geom::Vector3D Accelerometer = ComputeAccelerometer(DeltaTime);
+  carla::geom::Vector3D Gyroscope = ComputeGyroscope();
+  float Compass = ComputeCompass();
+
   auto Stream = GetDataStream(*this);
-  Stream.Send(
-      *this,
-      ComputeAccelerometer(DeltaTime),
-      ComputeGyroscope(),
-      ComputeCompass());
+
+  // ROS2
+  #if defined(WITH_ROS2)
+  auto ROS2 = carla::ros2::ROS2::GetInstance();
+  if (ROS2->IsEnabled())
+  {
+    TRACE_CPUPROFILER_EVENT_SCOPE_STR("ROS2 Send");
+    auto StreamId = carla::streaming::detail::token_type(GetToken()).get_stream_id();
+    AActor* ParentActor = GetAttachParentActor();
+    if (ParentActor)
+    {
+      FTransform LocalTransformRelativeToParent = GetActorTransform().GetRelativeTransform(ParentActor->GetActorTransform());
+      ROS2->ProcessDataFromIMU(Stream.GetSensorType(), StreamId, LocalTransformRelativeToParent, Accelerometer, Gyroscope, Compass, this);
+    }
+    else
+    {
+      ROS2->ProcessDataFromIMU(Stream.GetSensorType(), StreamId, Stream.GetSensorTransform(), Accelerometer, Gyroscope, Compass, this);
+    }
+  }
+  #endif
+
+  {
+    TRACE_CPUPROFILER_EVENT_SCOPE(AInertialMeasurementUnit::PostPhysTick);
+    Stream.SerializeAndSend(*this, Accelerometer, Gyroscope, Compass);
+  }
 }
 
 void AInertialMeasurementUnit::SetAccelerationStandardDeviation(const FVector &Vec)

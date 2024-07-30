@@ -17,12 +17,24 @@ void UCarlaLight::BeginPlay()
 {
   Super::BeginPlay();
 
+  RegisterLight();
+}
+
+void UCarlaLight::RegisterLight()
+{
+  if(bRegistered)
+  {
+    return;
+  }
+
   UWorld *World = GetWorld();
   if(World)
   {
     UCarlaLightSubsystem* CarlaLightSubsystem = World->GetSubsystem<UCarlaLightSubsystem>();
     CarlaLightSubsystem->RegisterLight(this);
   }
+  RegisterLightWithWeather();
+  bRegistered = true;
 }
 
 void UCarlaLight::OnComponentDestroyed(bool bDestroyingHierarchy)
@@ -38,6 +50,7 @@ void UCarlaLight::EndPlay(const EEndPlayReason::Type EndPlayReason)
     UCarlaLightSubsystem* CarlaLightSubsystem = World->GetSubsystem<UCarlaLightSubsystem>();
     CarlaLightSubsystem->UnregisterLight(this);
   }
+  Super::EndPlay(EndPlayReason);
 }
 
 void UCarlaLight::SetLightIntensity(float Intensity)
@@ -112,7 +125,14 @@ void UCarlaLight::SetLightState(carla::rpc::LightState LightState)
 
 FVector UCarlaLight::GetLocation() const
 {
-  return GetOwner()->GetActorLocation();
+  auto Location = GetOwner()->GetActorLocation();
+  ACarlaGameModeBase* GameMode = UCarlaStatics::GetGameMode(GetWorld());
+  ALargeMapManager* LargeMap = GameMode->GetLMManager();
+  if (LargeMap)
+  {
+    Location = LargeMap->LocalToGlobalLocation(Location);
+  }
+  return Location;
 }
 
 int UCarlaLight::GetId() const
